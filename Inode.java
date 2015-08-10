@@ -51,7 +51,7 @@ public class Inode {
     }
 
     // Save to disk as the iNumber-th Inode.
-    public int toDisk(short iNumber)
+    public void toDisk(short iNumber)
     {
         int blockNumber = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
 
