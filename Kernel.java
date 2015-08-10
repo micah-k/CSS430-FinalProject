@@ -60,6 +60,8 @@ private static SyncQueue ioQueue;    // I/O queue
 private final static int COND_DISK_REQ = 1; // wait condition
 private final static int COND_DISK_FIN = 2; // wait condition
 
+FileSystem fs;
+
 // Standard input
 private static BufferedReader input
 = new BufferedReader( new InputStreamReader( System.in ) );
@@ -85,6 +87,7 @@ case INTERRUPT_SOFTWARE: // System calls
     // instantiate synchronized queues
     ioQueue = new SyncQueue( );
     waitQueue = new SyncQueue( scheduler.getMaxThreads( ) );
+    fs = new FileSystem(1000);
     return OK;
     case EXEC:
     return sysExec( ( String[] )args );
@@ -147,45 +150,59 @@ case INTERRUPT_SOFTWARE: // System calls
     Kernel.ioQueue.dequeueAndWakeup(Kernel.COND_DISK_REQ);
     return OK;
     case READ:
-    switch ( param ) {
-    case STDIN:
-        try {
-        String s = input.readLine(); // read a keyboard input
-        if ( s == null ) {
-            return ERROR;
-        }
-        // prepare a read buffer
-        StringBuffer buf = ( StringBuffer )args;
+    switch ( param )
+    {
+        case STDIN:
+            try
+            {
+                String s = input.readLine(); // read a keyboard input
+                if ( s == null )
+                {
+                    return ERROR;
+                }
+                // prepare a read buffer
+                StringBuffer buf = ( StringBuffer )args;
 
-        // append the keyboard intput to this read buffer
-        buf.append( s );
+                // append the keyboard intput to this read buffer
+                buf.append( s );
 
-        // return the number of chars read from keyboard
-        return s.length( );
-        } catch ( IOException e ) {
-        System.out.println( e );
-        return ERROR;
-        }
-    case STDOUT:
-    case STDERR:
+                // return the number of chars read from keyboard
+                return s.length( );
+            }
+            catch ( IOException e )
+            {
+                System.out.println( e );
+                return ERROR;
+            }
+        case STDOUT:
+        case STDERR:
             System.out.println("threadOS: caused read errors");
-        return ERROR;
+            return ERROR;
+        default:
+        if((myTcb=scheduler.getMyTcb()) != null)
+        {
+            return fs.read(param, (byte[])args);
+        }
     }
-    // return FileSystem.read( param, byte args[] );
     return ERROR;
     case WRITE:
     switch ( param ) {
-    case STDIN:
-            System.out.println("threadOS: cannot write to System.in");
-        return ERROR;
-    case STDOUT:
-        System.out.print( (String)args );
-        break;
-    case STDERR:
-        System.err.print( (String)args );
-        break;
+        case STDIN:
+                System.out.println("threadOS: cannot write to System.in");
+            return ERROR;
+        case STDOUT:
+            System.out.print( (String)args );
+            break;
+        case STDERR:
+            System.err.print( (String)args );
+            break;
+        default:
+        if((myTcb=scheduler.getMyTcb()) != null)
+        {
+            return fs.write(param, (byte[])args);
+        }
     }
-    return OK;
+    return ERROR;
     case CREAD:   // to be implemented in assignment 4
     return cache.read( param, ( byte[] )args ) ? OK : ERROR;
     case CWRITE:  // to be implemented in assignment 4
@@ -197,17 +214,28 @@ case INTERRUPT_SOFTWARE: // System calls
     cache.flush( );
     return OK;
     case OPEN:    // to be implemented in project
-    return OK;
+    if((myTcb = scheduler.getMyTcb()) != null)
+    {
+        String[] temp = (String[])args;
+        FileTableEntry fte = fs.open(temp[0], temp[1]);
+        int fd = myTcb.getFd(fte);
+        return fd;
+    }
+    return ERROR;
     case CLOSE:   // to be implemented in project
-    return OK;
+    if((myTcb = scheduler.getMyTcb()) != null)
+        return fs.close(param);
+    else
+        return ERROR;
     case SIZE:    // to be implemented in project
-    return OK;
+    return fs.fsize(param);
     case SEEK:    // to be implemented in project
-    return OK;
+    int[] temp = (int[])args;
+    return fs.seek(param, temp[0], temp[1]);
     case FORMAT:  // to be implemented in project
-    return OK;
+    return fs.format(param);
     case DELETE:  // to be implemented in project
-    return OK;
+    return fs.delete((String)args);
     }
     return ERROR;
 case INTERRUPT_DISK: // Disk interrupts
