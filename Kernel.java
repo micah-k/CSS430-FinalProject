@@ -60,7 +60,7 @@ private static SyncQueue ioQueue;    // I/O queue
 private final static int COND_DISK_REQ = 1; // wait condition
 private final static int COND_DISK_FIN = 2; // wait condition
 
-FileSystem fs;
+private static FileSystem fs;
 
 // Standard input
 private static BufferedReader input
