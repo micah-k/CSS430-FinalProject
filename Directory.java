@@ -55,6 +55,7 @@ public class Directory
             byte[] bytes = fname.getBytes();        // Uses platform's default character set.
             System.arraycopy(bytes, 0, result, offset, bytes.length);
         }
+        return result;
     }
 
     public short ialloc(String filename)
@@ -71,6 +72,7 @@ public class Directory
                 break;
             }
         }
+        return result;
     }
 
     public boolean ifree(short iNumber)
@@ -79,8 +81,9 @@ public class Directory
         // the corresponding file will be deleted.
         if(iNumber <= 0 || iNumber >= fsize.length)
             return false;
-        fnames[iNumber] = new char[maxChars];
         fsize[iNumber] = 0;
+        fnames[iNumber] = new char[maxChars];
+        return true;
     }
 
     public short namei(String filename)
