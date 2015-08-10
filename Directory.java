@@ -17,7 +17,7 @@ public class Directory
         root.getChars( 0, fsize[0], fnames[0], 0 );    // fnames[0] includes "/"
     }
 
-    public int bytes2directory(byte data[])
+    public void bytes2directory(byte data[])
     {
         // assumes data[] received directory information from disk
         // initializes the Directory instance with this data[]
@@ -25,7 +25,7 @@ public class Directory
 
         for (int i = 0; i < fsize.length; i++ , offset += 4) // Store sizes, one at a time.
         {
-            SysLib.int2bytes(fsize[i], result, offset);    // Use SysLib's provided int2bytes function.
+            SysLib.bytes2int(data, offset);    // Use SysLib's provided int2bytes function.
         }
 
         for (int i = 0; i < fnames.length; i++, offset += maxChars * 2) // Store names, one at a time.
