@@ -164,7 +164,11 @@
     public synchronized int write(int fd, byte[] buffer)
     {
         FileTableEntry fte = fileTable.getFtEnt(fd);
-        if(fte == null) return ERROR;
+        if(fte == null)
+        {
+            SysLib.cout("Invalid file descriptor (" + fd + "). ");
+            return ERROR;
+        }
 
         short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
         int bytesWritten = 0;
@@ -172,6 +176,7 @@
 
         while (true)
         {
+
             switch(fte.inode.flag)
             {
                 case Inode.WRITE:
@@ -183,6 +188,7 @@
                         fte.inode.flag = Inode.USED;
                     break; // Let's try this again.
                 case Inode.DELETE:
+                    SysLib.cout("Inode deleted. ");
                     return ERROR;
                 default:
                     // Flag inode for writing.
@@ -197,7 +203,11 @@
                         {
                             // Grab a free block for the index.
                             short index = superBlock.claimBlock();
-                            if (index == ERROR) return ERROR; // No available free block.
+                            if (index == ERROR)
+                            {
+                                SysLib.cout("No available free blocks. ");
+                                return ERROR; // No available free block.
+                            }
 
                             // Set the indirect block.
                             fte.inode.indirect = index;
@@ -213,9 +223,17 @@
                         {
                             block = superBlock.claimBlock();
                             // No free blocks?
-                            if (block == ERROR) return ERROR;
+                            if (block == ERROR)
+                            {
+                                SysLib.cout("No available free blocks. ");
+                                return ERROR; // No available free block.
+                            }
 
-                            if (fte.inode.addBlock(block) == ERROR) return ERROR;
+                            if (fte.inode.addBlock(block) == ERROR)
+                            {
+                                SysLib.cout("Could not add block to inode. ");
+                                return ERROR; // No available free block.
+                            }
 
                             fte.inode.toDisk(fte.iNumber);
                         }
