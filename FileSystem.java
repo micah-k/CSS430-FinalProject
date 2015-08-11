@@ -449,7 +449,20 @@
         if (seekPtr / Disk.blockSize < 0)
             return -1;
         else if (seekPtr / Disk.blockSize < inode.directSize)
-            return inode.direct[seekPtr / Disk.blockSize];
+        {
+            int directBlock = inode.direct[seekPtr / Disk.blockSize];
+            if(directBlock == ERROR)
+            {
+                directBlock = superBlock.claimBlock();
+                if (directBlock == ERROR)
+                {
+                    SysLib.cout("No free blocks! ");
+                    return ERROR;
+                }
+                inode.addBlock(directBlock);
+            }
+            return directBlock;
+        }
 
         byte[] indirectBlock = new byte[Disk.blockSize];
         SysLib.rawread(inode.indirect, indirectBlock);
