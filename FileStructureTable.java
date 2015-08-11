@@ -74,13 +74,13 @@ public class FileStructureTable
   
     public synchronized FileTableEntry getFtEnt(int i)
     {
-        if (i >= 0 && i < table.length) return table.elementAt(i);
+        if (i >= 0 && i < table.size()) return table.elementAt(i);
         return null;
     }
   
     public synchronized int getFd(FileTableEntry fte)
     {
-        for (int i = 0; i < table.length)
+        for (int i = 0; i < table.size(); i++)
         {
             if (table.elementAt(i) == fte)
                 return i;
