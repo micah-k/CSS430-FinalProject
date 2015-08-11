@@ -381,7 +381,7 @@
 
         //Write the now zeroed indirect block back to disk
         SysLib.rawwrite(fte.inode.indirect, indirectBlock);
-        toDisk(fte.iNumber);
+        fte.inode.toDisk(fte.iNumber);
 
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
