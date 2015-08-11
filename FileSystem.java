@@ -450,7 +450,7 @@
             return -1;
         else if (seekPtr / Disk.blockSize < inode.directSize)
         {
-            int directBlock = inode.direct[seekPtr / Disk.blockSize];
+            short directBlock = inode.direct[seekPtr / Disk.blockSize];
             if(directBlock == ERROR)
             {
                 directBlock = superBlock.claimBlock();
