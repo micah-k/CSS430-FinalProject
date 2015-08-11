@@ -155,7 +155,7 @@
             // If last block isn't entirely full, dont read all of it.
             boolean lastBlock = (fte.inode.length - fte.seekPtr) < Disk.blockSize ||
                                 (fte.inode.length - fte.seekPtr) == 0;
-            SysLib.cout("Last block (" + lastBlock ? "true" : "false" + "). ");
+            SysLib.cout("Last block (" + (lastBlock ? "true" : "false") + "). ");
             readLength = (lastBlock ? (fte.inode.length - fte.seekPtr) : Disk.blockSize);
             SysLib.cout("Read length (" + readLength + "). ");
 
