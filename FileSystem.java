@@ -304,7 +304,7 @@
             try { wait(); } catch (InterruptedException e){}
         }
 
-        if(fte.inode.flag != USED)
+        if(fte.inode.flag != Inode.USED)
         {
             SysLib.cout("COUNT EQUALS 1 BUT FLAG NOT SET TO USED IN CLOSE. ");
         }
@@ -370,7 +370,7 @@
 
         Inode inode = new Inode(iNumber);
 
-        while(inode.flag == READ || inode.flag == WRITE)
+        while(inode.flag == Inode.READ || inode.flag == Inode.WRITE)
         {
             try { wait(); } catch (InterruptedException e){}            
         }
