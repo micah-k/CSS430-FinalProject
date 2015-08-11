@@ -6,6 +6,8 @@
     private Directory directory;
     private FileStructureTable fileTable;
 
+    private TCB myTcb;
+
     public static final int ERROR = -1;
 
     public static final int SET = 0;
@@ -14,23 +16,23 @@
 
     public FileSystem(int blocks)
     {
-        superblock = new SuperBlock(diskBlocks);
-        directory = new Directory(superblock.totalInodes);
-        filetable = new FileTable(directory);
+        superBlock = new SuperBlock(blocks);
+        directory = new Directory(superBlock.totalInodes);
+        fileTable = new FileStructureTable(directory);
 
         // Open the base directory file from the disk.
-        FileTableEntry dirEnt = open("/", "r");
+        FileTableEntry dir = open("/", "r");
 
         // Check for data in the directory.
-        int dirSize = fsize(dirEnt);
+        int dirSize = fsize(dir);
         if (dirSize > 0)
         {
             // If data has been stored, read it in.
-            byte[] dirData = new byte[dirSize];
-            read(dirEnt, dirData);
-            directory.bytes2directory(dirData);
+            byte[] data = new byte[dirSize];
+            read(dir, data);
+            directory.bytes2directory(data);
         }
-        close(dirEnt);
+        close(dir);
     }
 
     public FileTableEntry open(String filename, String mode)
@@ -246,7 +248,7 @@
                     if (fte.seekPtr >= fte.inode.length)
                     {
                         // Seek ptr is at end of file, becomes new length.
-                        fte.inode.length = fte.seekPtr
+                        fte.inode.length = fte.seekPtr;
                         fte.inode.toDisk(fte.iNumber);
                     }
 
