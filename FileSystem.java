@@ -22,18 +22,19 @@
 
         // Open the base directory file from the disk.
         FileTableEntry dir = open("/", "r");
-        int fd = fileTable.getFd(dir);
 
         // Check for data in the directory.
-        int dirSize = fsize(fd);
+        int dirSize = fte.inode.length;
         if (dirSize > 0)
         {
             // If data has been stored, read it in.
             byte[] data = new byte[dirSize];
-            read(fd, data);
+            readFromFtEnt(fte, data);
             directory.bytes2directory(data);
         }
-        close(fd);
+        fte.inode.flag = Inode.USED;
+        fte.inode.toDisk(fte.iNumber);
+        return fileTable.ffree(fte) ? 0 : ERROR;
     }
 
     public FileTableEntry open(String filename, String mode)
@@ -100,8 +101,6 @@
             return ERROR;
         }
 
-        int bytesRead = 0;
-        int readLength = 0;
         fte.count++;
 
         while (true)
@@ -117,55 +116,62 @@
                 default: // UNUSED, USED, READ
                     // Flag block as read so other threads don't interfere.
                     fte.inode.flag = Inode.READ;
-                    fte.count++;
 
-                    // Byte array for block data.
-                    byte[] data = new byte[Disk.blockSize];
-                    int cpyStart = 0;
+                    int bytesRead = readFromFtEnt(fte, buffer);
 
-                    while (bytesRead < buffer.length) // While there's space in the buffer to read into,
-                    {
-                        int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+                    // Decrement count, if necessary
+                    fte.count--;
 
-                        // Error check,
-                        if (block == ERROR) return ERROR;
-
-                        //Read from disk,
-                        if (SysLib.rawread(block, data) == ERROR) return ERROR;
-
-                        // If last block isn't entirely full, dont read all of it.
-                        boolean lastBlock = (fte.inode.length - fte.seekPtr) < Disk.blockSize ||
-                                            (fte.inode.length - fte.seekPtr) == 0;
-                        readLength = (lastBlock ? (fte.inode.length - fte.seekPtr) : Disk.blockSize);
-
-                        // Remaining data in one disk block,
-                        if (buffer.length < (512 - fte.seekPtr))
-                        {
-                            System.arraycopy(data, fte.seekPtr, buffer, 0, buffer.length); // Copy into buffer,
-                            bytesRead = buffer.length; //Increment read count,
-                        }
-
-                        // Remaining data in multiple blocks,
-                        else
-                        {
-                            System.arraycopy(data, 0, buffer, cpyStart, readLength); // Copy into buffer,
-                            bytesRead += readLength; //Increment read count,
-                        }
-
-                        cpyStart = cpyStart + readLength - 1;
-                        seek(fd, readLength, CUR);
-                    }
-
-                // Decrement count, if necessary
-                fte.count--;
-
-                // If there's another child thread waiting, wake it up
-                if (fte.count > 0) notifyAll();
-                else fte.inode.flag = Inode.USED; // This inode is no longer in a read state.
-                
-                return bytesRead;
+                    // If there's another child thread waiting, wake it up
+                    if (fte.count > 0) notifyAll();
+                    else fte.inode.flag = Inode.USED; // This inode is no longer in a read state.
+                    
+                    return bytesRead;
             }
         }
+    }
+
+    private synchronized int readFromFtEnt(FileTableEntry fte, byte[] buffer)
+    {
+        byte[] data = new byte[Disk.blockSize];
+        int bytesRead = 0;
+        int readLength = 0;
+        int cpyStart = 0;
+
+        while (bytesRead < buffer.length) // While there's space in the buffer to read into,
+        {
+            int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+
+            // Error check,
+            if (block == ERROR) return ERROR;
+
+            //Read from disk,
+            if (SysLib.rawread(block, data) == ERROR) return ERROR;
+
+            // If last block isn't entirely full, dont read all of it.
+            boolean lastBlock = (fte.inode.length - fte.seekPtr) < Disk.blockSize ||
+                                (fte.inode.length - fte.seekPtr) == 0;
+            readLength = (lastBlock ? (fte.inode.length - fte.seekPtr) : Disk.blockSize);
+
+            // Remaining data in one disk block,
+            if (buffer.length < (512 - fte.seekPtr))
+            {
+                System.arraycopy(data, fte.seekPtr, buffer, 0, buffer.length); // Copy into buffer,
+                bytesRead = buffer.length; //Increment read count,
+            }
+
+            // Remaining data in multiple blocks,
+            else
+            {
+                System.arraycopy(data, 0, buffer, cpyStart, readLength); // Copy into buffer,
+                bytesRead += readLength; //Increment read count,
+            }
+
+            cpyStart = cpyStart + readLength - 1;
+            seek(fd, readLength, CUR);
+        }
+
+        return bytesRead;
     }
 
     public synchronized int write(int fd, byte[] buffer)
@@ -303,7 +309,7 @@
 
     public int fsize(int fd)
     {
-        FileTableEntry fte = fileTable.getFtEnt(fd);
+        FileTableEntry fte = convertFdToFtEnt(fd);
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
             fd = myTcb.getFd(fte);
         if(fte == null) return ERROR;
@@ -312,7 +318,7 @@
 
     public int seek(int fd, int offset, int whence)
     {
-        FileTableEntry fte = fileTable.getFtEnt(fd);
+        FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null) return ERROR;
         int seek = fte.seekPtr;
         switch(whence)
@@ -424,7 +430,7 @@
         FileTableEntry fte = null;
         if ((myTcb = Kernel.scheduler.getMyTcb()) != null)
         {
-            fte = myTcb.getFtEnt();
+            fte = myTcb.getFtEnt(fd);
         }
         return fte;
     }
