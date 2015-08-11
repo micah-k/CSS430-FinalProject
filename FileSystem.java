@@ -130,15 +130,17 @@
         int bytesRead = 0;
         int readLength = 0;
         int cpyStart = 0;
+        int iteration = 0;
 
         while (bytesRead < buffer.length) // While there's space in the buffer to read into,
         {
+            iteration++;
             int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
 
             // Error check,
             if (block == ERROR)
             {
-                SysLib.cout("Could not find block from seek ptr (" + fte.seekPtr + "). ");
+                SysLib.cout("Could not find block from seek ptr (" + fte.seekPtr + ") in iteration (" + iteration + "). ");
                 return ERROR;
             }
 
