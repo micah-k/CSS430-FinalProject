@@ -29,10 +29,10 @@ public class Inode {
     // Retrieve Inode from disk.
     public Inode(short iNumber)
     {
-        int blockNumber = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
+        int block = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
 
         byte[] inodeData = new byte[Disk.blockSize]; // In computer development there is no way to read a portion of a block from, or write a portion to, the disk.
-        SysLib.rawread(blockNumber, inodeData);
+        SysLib.rawread(block, inodeData);
 
         int offset = (iNumber % 16) * iNodeSize; // Start offset pointer at head of the node's position in the block.
 
@@ -53,10 +53,10 @@ public class Inode {
     // Save to disk as the iNumber-th Inode.
     public void toDisk(short iNumber)
     {
-        int blockNumber = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
+        int block = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
 
         byte[] inodeData = new byte[Disk.blockSize]; // In computer development there is no way to read a portion of a block from, or write a portion to, the disk.
-        SysLib.rawread(blockNumber, inodeData);
+        SysLib.rawread(block, inodeData);
 
         int offset = (iNumber % 16) * iNodeSize; // Start offset pointer at head of the node's position in the block.
         
@@ -72,6 +72,35 @@ public class Inode {
         }
         SysLib.short2bytes(indirect, inodeData, offset); // Indirect pointer...
 
-        SysLib.rawwrite(blockNumber, inodeData); // Write the block back to the disk.
+        SysLib.rawwrite(block, inodeData); // Write the block back to the disk.
+    }
+
+    public int addBlock(short block)
+    {
+        // Check for space in direct block.
+        for (int i = 0; i < directSize; i++)
+        {
+            if (direct[i] <= 0)
+            {
+                direct[i] = block;
+                return 0; // Success
+            }
+        }
+
+        // No space in direct; try indirect next.
+        byte[] data = new byte[Disk.blockSize];
+        SysLib.rawread(indirect, data);
+        for(short offset = 0; offset < indirectSize *2; offset += 2)
+        {
+            //The next free indirect will be -1
+            if (SysLib.bytes2short(data, offset) <= 0)
+            {
+                //write the block number to the byte array
+                SysLib.short2bytes(block, data, offset);
+                //write the block back to disk return success condition on disk
+                return SysLib.rawwrite(indirect, data);
+            }
+        }
+        return -1;
     }
 }
