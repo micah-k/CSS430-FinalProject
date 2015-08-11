@@ -49,7 +49,7 @@ public final static int OK = 0;
 public final static int ERROR = -1;
 
 // System thread references
-private static Scheduler scheduler;
+public static Scheduler scheduler;
 private static Disk disk;
 private static Cache cache;
 

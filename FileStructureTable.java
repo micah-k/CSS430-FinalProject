@@ -70,21 +70,4 @@ public class FileStructureTable
     {
         return table.isEmpty();  // return if table is empty 
     }                            // should be called before starting a format
-
-  
-    public synchronized FileTableEntry getFtEnt(int i)
-    {
-        if (i > 1 && i < table.size() + 2) return table.elementAt(i-2); //First two fds in TCB aren't stored in file table.
-        return null;
-    }
-  
-    public synchronized int getFd(FileTableEntry fte)
-    {
-        for (int i = 0; i < table.size(); i++)
-        {
-            if (table.elementAt(i) == fte)
-                return i + 2; //First two fds in TCB aren't stored in file table.
-        }
-        return -1;
-    }
 }

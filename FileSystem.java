@@ -42,48 +42,48 @@
         //new file if one does not exist
         boolean newFile = directory.namei(filename) == -1;
         FileTableEntry fte = fileTable.falloc(filename, mode);
-        int fd = fileTable.getFd(fte);
         short flag;
 
         // Can't use a switch statement because Strings compare diferently.
         if (mode.equals("a"))
         {
-            seek(fd, 0, END);
+            fte.seekPtr = fte.inode.length;
             flag = Inode.WRITE;
         }
         else if (mode.equals("w"))
         {
-            seek(fd, 0, SET);
+            fte.seekPtr = 0;
             deallocAllBlocks(fte);
             newFile = true;
             flag = Inode.WRITE;
         }
         else if (mode.equals("w+"))
         {
-            seek(fd, 0, SET);
+            fte.seekPtr = 0;
             flag = Inode.WRITE;
         }
         else //mode.equals("r")
         {
             if (newFile) 
                 return null;  
-            seek(fd, 0, SET);
+            fte.seekPtr = 0;
             flag = Inode.READ;
         }
 
         // We only want to set the flag if we are the first one in
-        if (fte.count == 1) {
+        if (fte.inode.count == 1)
+        {
             fte.inode.flag = flag;
         }
-        //Allocate hard drive space for the file if its new
-        if (newFile) {
-            //assign a direct block to it
+        
+        if (newFile)
+        {
+            // Claim a free block for the new direct block.
             short directBlock = superBlock.claimBlock();
             if (directBlock == ERROR)
             {
-                return null; //Not enough space for a direct block
+                return null; // No free blocks available.
             }
-
 
             fte.inode.addBlock(directBlock);
             fte.inode.toDisk(fte.iNumber); 
@@ -93,11 +93,16 @@
 
     public synchronized int read(int fd, byte[] buffer)
     {
-        FileTableEntry fte = fileTable.getFtEnt(fd);
-        if(fte == null) return ERROR;
+        FileTableEntry fte = convertFdToFtEnt(fd);
+        if(fte == null)
+        {
+            SysLib.cout("Invalid file descriptor (" + fd + "). ");
+            return ERROR;
+        }
 
         int bytesRead = 0;
         int readLength = 0;
+        fte.count++;
 
         while (true)
         {
@@ -107,14 +112,16 @@
                     try { wait(); } catch (InterruptedException e) {} // Wait for whatever's writing to stahp.
                     break; // Let's try this again.
                 case Inode.DELETE: // Y u do dis.
+                    fte.count--;
                     return ERROR; // Dun do dis.
                 default: // UNUSED, USED, READ
                     // Flag block as read so other threads don't interfere.
                     fte.inode.flag = Inode.READ;
+                    fte.count++;
 
                     // Byte array for block data.
                     byte[] data = new byte[Disk.blockSize];
-                    int bufsize = 0;
+                    int cpyStart = 0;
 
                     while (bytesRead < buffer.length) // While there's space in the buffer to read into,
                     {
@@ -141,18 +148,18 @@
                         // Remaining data in multiple blocks,
                         else
                         {
-                            System.arraycopy(data, 0, buffer, bufsize, readLength); // Copy into buffer,
+                            System.arraycopy(data, 0, buffer, cpyStart, readLength); // Copy into buffer,
                             bytesRead += readLength; //Increment read count,
                         }
 
-                        bufsize = bufsize + readLength - 1; // Shrink bufsize to
+                        cpyStart = cpyStart + readLength - 1;
                         seek(fd, readLength, CUR);
                     }
 
                 // Decrement count, if necessary
-                if (fte.count > 0) fte.count--;
+                fte.count--;
 
-                //If there's another thread waiting, wake it up
+                // If there's another child thread waiting, wake it up
                 if (fte.count > 0) notifyAll();
                 else fte.inode.flag = Inode.USED; // This inode is no longer in a read state.
                 
@@ -163,7 +170,7 @@
 
     public synchronized int write(int fd, byte[] buffer)
     {
-        FileTableEntry fte = fileTable.getFtEnt(fd);
+        FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
             SysLib.cout("Invalid file descriptor (" + fd + "). ");
@@ -173,6 +180,7 @@
         short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
         int bytesWritten = 0;
         int blockOffset = fte.seekPtr % Disk.blockSize;
+        fte.count++;
 
         while (true)
         {
@@ -188,6 +196,7 @@
                         fte.inode.flag = Inode.USED;
                     break; // Let's try this again.
                 case Inode.DELETE:
+                    fte.count--;
                     SysLib.cout("Inode deleted. ");
                     return ERROR;
                 default:
@@ -275,7 +284,7 @@
 
     public synchronized int close(int fd)
     {
-        FileTableEntry fte = fileTable.getFtEnt(fd);
+        FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null) return ERROR;
 
         // If the file has an open on it, close the open.
@@ -295,6 +304,8 @@
     public int fsize(int fd)
     {
         FileTableEntry fte = fileTable.getFtEnt(fd);
+        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
+            fd = myTcb.getFd(fte);
         if(fte == null) return ERROR;
         return fte.inode.length;
     }
@@ -406,5 +417,15 @@
         byte[] indirectBlock = new byte[Disk.blockSize];
         SysLib.rawread(inode.indirect, indirectBlock);
         return SysLib.bytes2short(indirectBlock, seekPtr / Disk.blockSize - inode.directSize);
+    }
+
+    private FileTableEntry convertFdToFtEnt(int fd)
+    {
+        FileTableEntry fte = null;
+        if ((myTcb = Kernel.scheduler.getMyTcb()) != null)
+        {
+            fte = myTcb.getFtEnt();
+        }
+        return fte;
     }
  }
