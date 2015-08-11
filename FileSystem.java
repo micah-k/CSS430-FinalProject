@@ -312,7 +312,6 @@
         // Flag and write the file to disk.
         fte.inode.toDisk(fte.iNumber);
         return fileTable.ffree(fte) ? 0 : ERROR;
-        return 0;
     }
 
     public int fsize(int fd)
