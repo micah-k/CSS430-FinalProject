@@ -22,17 +22,20 @@
 
         // Open the base directory file from the disk.
         FileTableEntry dir = open("/", "r");
+        int fd;
+        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
+            fd = myTcb.getFd(dir);
 
         // Check for data in the directory.
-        int dirSize = fsize(dir);
+        int dirSize = fsize(fd);
         if (dirSize > 0)
         {
             // If data has been stored, read it in.
             byte[] data = new byte[dirSize];
-            read(dir, data);
+            read(fd, data);
             directory.bytes2directory(data);
         }
-        close(dir);
+        close(fd);
     }
 
     public FileTableEntry open(String filename, String mode)
@@ -40,32 +43,35 @@
         //Check if it is a new file before falloc because falloc will create a
         //new file if one does not exist
         boolean new_file = directory.namei(filename) == -1;
-        FileTableEntry fte = filetable.falloc(filename, mode);
+        FileTableEntry fte = fileTable.falloc(filename, mode);
+        int fd;
+        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
+            fd = myTcb.getFd(dir);
         short flag;
 
         // Can't use a switch statement because Strings compare diferently.
         if (mode.equals("a"))
         {
-            seek(fte, 0, END);
+            seek(fd, 0, END);
             flag = Inode.WRITE;
         }
         else if (mode.equals("w"))
         {
-            seek(fte, 0, SET);
+            seek(fd, 0, SET);
             deallocAllBlocks(fte);
             new_file = true;
             flag = Inode.WRITE;
         }
         else if (mode.equals("w+"))
         {
-            seek(fte, 0, SET);
+            seek(fd, 0, SET);
             flag = Inode.WRITE;
         }
         else //mode.equals("r")
         {
             if (new_file) 
                 return null;  
-            seek(fte, 0, SET);
+            seek(fd, 0, SET);
             flag = Inode.READ;
         }
 
@@ -76,7 +82,7 @@
         //Allocate hard drive space for the file if its new
         if (new_file) {
             //assign a direct block to it
-            int direct_block = superblock.getFreeBlock();
+            int direct_block = superBlock.getFreeBlock();
             if (direct_block == ERROR) {
                 return null; //Not enough space for a direct block
             }
@@ -195,7 +201,7 @@
                         if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
                         {
                             // Grab a free block for the index.
-                            short index = superblock.getFreeBlock();
+                            short index = superBlock.getFreeBlock();
                             if (index == ERROR) return ERROR; // No available free block.
 
                             // Set the indirect block.
@@ -210,7 +216,7 @@
                         // If the next block doesn't exist, claim a free block to fill.
                         if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
                         {
-                            block = superblock.getFreeBlock();
+                            block = superBlock.getFreeBlock();
                             // No free blocks?
                             if (block == ERROR) return ERROR;
 
@@ -314,7 +320,7 @@
     }
 
     public int format(int files)
-    {
+ B  {
         if (files > 0){
             superblock.format(files);
             //directory = new Directory(files);
@@ -341,7 +347,7 @@
 
 
     private boolean deallocAllBlocks(FileTableEntry fte)
-    {
+ B  {
         Vector<Short> blocksFreed = new Vector<Short>();
 
         // Clear direct blocks.
