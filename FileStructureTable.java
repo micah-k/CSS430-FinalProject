@@ -20,25 +20,10 @@ public class FileStructureTable
         if (iNumber >= 0) // if the file exists
         {
             inode = new Inode(iNumber);
-            if (mode.equals("r"))
-            {
-                if (inode.flag == Inode.UNUSED || inode.flag == Inode.USED || inode.flag == Inode.READ)
-                    inode.flag = Inode.READ;
-                else if (inode.flag == Inode.WRITE)                    // Wait for file to be readable
-                    try { wait(); } catch (InterruptedException e) {}
-                else // inode.flag == Inode.DELETE
-                    return null;
-            }
-
-            else // mode.equals(ww || w+ || a)
-            {
-                if(inode.flag == Inode.UNUSED || inode.flag == Inode.USED)
-                    inode.flag = Inode.WRITE;
-                else if (inode.flag == Inode.WRITE || inode.flag == Inode.READ) // Wait for file to be writeable
-                    try { wait(); } catch (InterruptedException e) {}
-                else // inode.flag == Inode.DELETE
-                    return null;
-            }
+            if (inode.flag == Inode.UNUSED)
+                inode.flag = Inode.USED;
+            else if (inode.flag == Inode.DELETE)
+                return null;
         }
         else // iNumber == -1, file doesn't exist
         {      

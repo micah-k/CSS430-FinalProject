@@ -224,7 +224,11 @@ case INTERRUPT_SOFTWARE: // System calls
     return ERROR;
     case CLOSE:   // to be implemented in project
     if((myTcb = scheduler.getMyTcb()) != null)
-        return fs.close(param);
+    {
+        int result = fs.close(param);
+        myTcb.returnFd(param);
+        return result;
+    }
     else
         return ERROR;
     case SIZE:    // to be implemented in project

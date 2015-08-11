@@ -43,38 +43,27 @@
         //new file if one does not exist
         boolean newFile = directory.namei(filename) == -1;
         FileTableEntry fte = fileTable.falloc(filename, mode);
-        short flag;
 
         // Can't use a switch statement because Strings compare diferently.
         if (mode.equals("a"))
         {
             fte.seekPtr = fte.inode.length; // Can't use seek in open, because no fd exists yet.
-            flag = Inode.WRITE;
         }
         else if (mode.equals("w"))
         {
             fte.seekPtr = 0;
             deallocAllBlocks(fte);
             newFile = true;
-            flag = Inode.WRITE;
         }
         else if (mode.equals("w+"))
         {
             fte.seekPtr = 0;
-            flag = Inode.WRITE;
         }
         else //mode.equals("r")
         {
             if (newFile) 
                 return null;  
             fte.seekPtr = 0;
-            flag = Inode.READ;
-        }
-
-        // We only want to set the flag if we are the first one in
-        if (fte.inode.count == 1)
-        {
-            fte.inode.flag = flag;
         }
         
         if (newFile)
@@ -101,34 +90,37 @@
             return ERROR;
         }
 
+        boolean loop = true;
+        int bytesRead = ERROR;
         fte.count++;
 
-        while (true)
+        while (loop)
         {
             switch(fte.inode.flag)
             {
                 case Inode.WRITE:
                     try { wait(); } catch (InterruptedException e) {} // Wait for whatever's writing to stahp.
                     break; // Let's try this again.
+                case Inode.UNUSED:
                 case Inode.DELETE: // Y u do dis.
-                    fte.count--;
-                    return ERROR; // Dun do dis.
+                    loop = false;
+                    break;
                 default: // UNUSED, USED, READ
                     // Flag block as read so other threads don't interfere.
                     fte.inode.flag = Inode.READ;
 
-                    int bytesRead = readFromFtEnt(fte, buffer);
+                    bytesRead = readFromFtEnt(fte, buffer);
 
                     // Decrement count, if necessary
-                    fte.count--;
 
-                    // If there's another child thread waiting, wake it up
-                    if (fte.count > 0) notifyAll();
-                    else fte.inode.flag = Inode.USED; // This inode is no longer in a read state.
-                    
-                    return bytesRead;
+                    fte.inode.flag = Inode.USED;                    
+                    if (fte.count > 0) notifyAll(); // If there's another child thread waiting, wake it up
+                    loop = false;
             }
         }
+
+        fte.count--;                    
+        return bytesRead;
     }
 
     private synchronized int readFromFtEnt(FileTableEntry fte, byte[] buffer)
@@ -183,95 +175,36 @@
             return ERROR;
         }
 
-        short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
-        int bytesWritten = 0;
-        int blockOffset = fte.seekPtr % Disk.blockSize;
-        fte.count++;
-
-        while (true)
+        if(fte.mode.equals("r"))
         {
+            SysLib.cout("Cannot write in read mode. ");
+            return ERROR;
+        }
 
+        int bytesWritten = ERROR;
+        fte.count++;
+        boolean loop = true;
+
+        while (loop)
+        {
             switch(fte.inode.flag)
             {
                 case Inode.WRITE:
                 case Inode.READ:
                     // Inode occupied; can't write.
-                    if (fte.count > 1) // If in use, wait until open.
-                        try { wait(); } catch (InterruptedException e){}
-                    else // If not, must be a mistaken flag; change to unopened.
-                        fte.inode.flag = Inode.USED;
+                    try { wait(); } catch (InterruptedException e){}
                     break; // Let's try this again.
                 case Inode.DELETE:
-                    fte.count--;
+                case Inode.UNUSED:
                     SysLib.cout("Inode deleted. ");
-                    return ERROR;
-                default:
+                    loop = false;
+                    break;
+                default: // USED
                     // Flag inode for writing.
                     fte.inode.flag = Inode.WRITE;
 
-                    byte[] data = new byte[Disk.blockSize];
-                    short inodeOffset;
-                    while (bytesWritten < buffer.length)
-                    {
-                        inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
-                        if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
-                        {
-                            // Grab a free block for the index.
-                            short index = superBlock.claimBlock();
-                            if (index == ERROR)
-                            {
-                                SysLib.cout("No available free blocks. ");
-                                return ERROR; // No available free block.
-                            }
+                    bytesWritten = writeFromFtEnt(fte, buffer);
 
-                            // Set the indirect block.
-                            fte.inode.indirect = index;
-                            // Save to disk.
-                            fte.inode.toDisk(fte.iNumber);
-                        }
-
-                        // Variable used multiple times; copy to local to prevent excess aritmetic.
-                        int remainingBytes = buffer.length - bytesWritten;
-
-                        // If the next block doesn't exist, claim a free block to fill.
-                        if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
-                        {
-                            block = superBlock.claimBlock();
-                            // No free blocks?
-                            if (block == ERROR)
-                            {
-                                SysLib.cout("No available free blocks. ");
-                                return ERROR; // No available free block.
-                            }
-
-                            if (fte.inode.addBlock(block) == ERROR)
-                            {
-                                SysLib.cout("Could not add block to inode. ");
-                                return ERROR; // No available free block.
-                            }
-
-                            fte.inode.toDisk(fte.iNumber);
-                        }
-                
-                        // Load the block,
-                        SysLib.rawread(block, data);
-
-                        // Write one block from the buffer. If there's less than a block left to write in the buffer, just fill the remaining space.
-                        int writeLength = ((remainingBytes < (Disk.blockSize - blockOffset)) ? remainingBytes : (Disk.blockSize - blockOffset));
-                        System.arraycopy(buffer, bytesWritten, data, blockOffset, writeLength);
-                        
-                        // Save the block,
-                        SysLib.rawwrite(block, data);
-
-                        // Next contestant.
-                        block++;
-                        bytesWritten += writeLength;
-                        fte.seekPtr += writeLength;
-                        // Block offset starts at 0 for new blocks.
-                        blockOffset = 0; 
-                    }
-                    // We've finished writing, so 
-                    fte.count--;
 
                     // Seek ptr past EOF? File has grown; update length.
                     if (fte.seekPtr >= fte.inode.length)
@@ -281,37 +214,110 @@
                         fte.inode.toDisk(fte.iNumber);
                     }
 
+                    fte.inode.flag = Inode.USED;
                     if (fte.count > 0) notifyAll(); // Notify waiting threads, if they exist.
-                    else fte.inode.flag = Inode.USED; // If not, reset flag.
-                    return bytesWritten;
+                    loop = false;
             }
         }
+
+        fte.count--;
+        return bytesWritten;
+    }
+
+    private synchronized int writeFromFtEnt(FileTableEntry fte, byte[] buffer)
+    {
+        short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+        int bytesWritten = 0;
+        int blockOffset = fte.seekPtr % Disk.blockSize;
+        byte[] data = new byte[Disk.blockSize];
+        short inodeOffset;
+        while (bytesWritten < buffer.length)
+        {
+            inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
+            if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
+            {
+                // Grab a free block for the index.
+                short index = superBlock.claimBlock();
+                if (index == ERROR)
+                {
+                    SysLib.cout("No available free blocks. ");
+                    return ERROR;
+                }
+
+                // Set the indirect block.
+                fte.inode.indirect = index;
+                // Save to disk.
+                fte.inode.toDisk(fte.iNumber);
+            }
+
+            // Variable used multiple times; copy to local to prevent excess aritmetic.
+            int remainingBytes = buffer.length - bytesWritten;
+
+            // If the next block doesn't exist, claim a free block to fill.
+            if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
+            {
+                block = superBlock.claimBlock();
+                // No free blocks?
+                if (block == ERROR)
+                {
+                    SysLib.cout("No available free blocks. ");
+                    return ERROR;
+                }
+
+                if (fte.inode.addBlock(block) == ERROR)
+                {
+                    SysLib.cout("Could not add block to inode. ");
+                    return ERROR;
+                }
+
+                fte.inode.toDisk(fte.iNumber);
+            }
+    
+            // Load the block,
+            SysLib.rawread(block, data);
+
+            // Write one block from the buffer. If there's less than a block left to write in the buffer, just fill the remaining space.
+            int writeLength = ((remainingBytes < (Disk.blockSize - blockOffset)) ? remainingBytes : (Disk.blockSize - blockOffset));
+            System.arraycopy(buffer, bytesWritten, data, blockOffset, writeLength);
+            
+            // Save the block,
+            SysLib.rawwrite(block, data);
+
+            // Next contestant.
+            block++;
+            bytesWritten += writeLength;
+            fte.seekPtr += writeLength;
+            // Block offset starts at 0 for new blocks.
+            blockOffset = 0; 
+        }
+        return bytesWritten;
     }
 
     public synchronized int close(int fd)
     {
         FileTableEntry fte = convertFdToFtEnt(fd);
-        if(fte == null) return ERROR;
+        if(fte == null) return ERROR; // UNUSED, DELETE
 
-        // If the file has an open on it, close the open.
-        if (fte.count > 0)
-            fte.count--;
-
-        // If not, flag and write the file to disk.
-        else
+        // If the file has an open on it, wait for it to finish.
+        while(fte.count > 1)
         {
-            fte.inode.flag = Inode.USED;
-            fte.inode.toDisk(fte.iNumber);
-            return fileTable.ffree(fte) ? 0 : ERROR;
+            try { wait(); } catch (InterruptedException e){}
         }
+
+        if(fte.inode.flag != USED)
+        {
+            SysLib.cout("COUNT EQUALS 1 BUT FLAG NOT SET TO USED IN CLOSE. ");
+        }
+
+        // Flag and write the file to disk.
+        fte.inode.toDisk(fte.iNumber);
+        return fileTable.ffree(fte) ? 0 : ERROR;
         return 0;
     }
 
     public int fsize(int fd)
     {
         FileTableEntry fte = convertFdToFtEnt(fd);
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fd = myTcb.getFd(fte);
         if(fte == null) return ERROR;
         return fte.inode.length;
     }
@@ -319,7 +325,9 @@
     public int seek(int fd, int offset, int whence)
     {
         FileTableEntry fte = convertFdToFtEnt(fd);
+
         if(fte == null) return ERROR;
+
         int seek = fte.seekPtr;
         switch(whence)
         {
@@ -333,11 +341,10 @@
                 seek = fsize(fd) + offset;
                 break;
             default:
-                return -1;
+                return ERROR;
         }
-        if (seek < 0) {
-            return -1;
-        }
+        if (seek < 0) return ERROR;
+
         //set the seek pointer in the entry
         fte.seekPtr = seek;
         return fte.seekPtr;
@@ -345,13 +352,14 @@
 
     public int format(int files)
     {
-        if (files > 0){
+        if (files > 0)
+        {
             superBlock.format(files);
             directory = new Directory(files);
             fileTable = new FileStructureTable(directory);
             return 0;
         }
-        return -1;
+        return ERROR;
     }
 
     public synchronized int delete(String filename)
@@ -359,7 +367,13 @@
         short iNumber = directory.namei(filename);
         if (iNumber == ERROR) return ERROR;
 
+
         Inode inode = new Inode(iNumber);
+
+        while(inode.flag == READ || inode.flag == WRITE)
+        {
+            try { wait(); } catch (InterruptedException e){}            
+        }
         // Flag block for deletion.
         inode.flag = Inode.DELETE;
         if (!directory.ifree(iNumber)) return ERROR;
