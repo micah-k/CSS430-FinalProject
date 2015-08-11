@@ -46,7 +46,7 @@
         FileTableEntry fte = fileTable.falloc(filename, mode);
         int fd;
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fd = myTcb.getFd(dir);
+            fd = myTcb.getFd(fte);
         short flag;
 
         // Can't use a switch statement because Strings compare diferently.
@@ -82,11 +82,14 @@
         //Allocate hard drive space for the file if its new
         if (new_file) {
             //assign a direct block to it
-            int direct_block = superBlock.getFreeBlock();
-            if (direct_block == ERROR) {
+            int direct_block = superBlock.claimBlock();
+            if (direct_block == ERROR)
+            {
                 return null; //Not enough space for a direct block
             }
-            fte.inode.setNextBlockNumber(direct_block);
+
+
+            fte.inode.addBlock(direct_block);
             fte.inode.toDisk(fte.iNumber); 
         }
         return fte;
@@ -201,7 +204,7 @@
                         if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
                         {
                             // Grab a free block for the index.
-                            short index = superBlock.getFreeBlock();
+                            short index = superBlock.claimBlock();
                             if (index == ERROR) return ERROR; // No available free block.
 
                             // Set the indirect block.
@@ -216,7 +219,7 @@
                         // If the next block doesn't exist, claim a free block to fill.
                         if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
                         {
-                            block = superBlock.getFreeBlock();
+                            block = superBlock.claimBlock();
                             // No free blocks?
                             if (block == ERROR) return ERROR;
 
@@ -320,7 +323,7 @@
     }
 
     public int format(int files)
- B  {
+    {
         if (files > 0){
             superblock.format(files);
             //directory = new Directory(files);
@@ -347,7 +350,7 @@
 
 
     private boolean deallocAllBlocks(FileTableEntry fte)
- B  {
+    {
         Vector<Short> blocksFreed = new Vector<Short>();
 
         // Clear direct blocks.
