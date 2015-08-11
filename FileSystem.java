@@ -223,13 +223,8 @@
                             // No free blocks?
                             if (block == ERROR) return ERROR;
 
-                            //Set this new block in the inode so it knows 
-                            //where the rest of the file will go
-                            if (!(fte.inode.addBlock(block)))
-                            {
-                                return ERROR;
-                            }
-                            //write the inode to disk immediately FIXME check logic
+                            if (fte.inode.addBlock(block) == ERROR) return ERROR;
+
                             fte.inode.toDisk(fte.iNumber);
                         }
                 
@@ -312,7 +307,7 @@
                 seek += offset;
                 break;
             case END: 
-                seek = fsize(fte) + offset;
+                seek = fsize(fd) + offset;
                 break;
             default:
                 return -1;
