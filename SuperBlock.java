@@ -83,7 +83,7 @@ class SuperBlock {
 
         sync();                                 // Superblock has changed; update disk.
 
-        return result;                          // Return the pointer.
+        return (short)result;                          // Return the pointer.
     }
 
     // Return a block to the freelist

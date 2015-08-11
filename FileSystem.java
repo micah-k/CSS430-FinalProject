@@ -42,7 +42,7 @@
     {
         //Check if it is a new file before falloc because falloc will create a
         //new file if one does not exist
-        boolean new_file = directory.namei(filename) == -1;
+        boolean newFile = directory.namei(filename) == -1;
         FileTableEntry fte = fileTable.falloc(filename, mode);
         int fd;
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
@@ -59,7 +59,7 @@
         {
             seek(fd, 0, SET);
             deallocAllBlocks(fte);
-            new_file = true;
+            newFile = true;
             flag = Inode.WRITE;
         }
         else if (mode.equals("w+"))
@@ -69,7 +69,7 @@
         }
         else //mode.equals("r")
         {
-            if (new_file) 
+            if (newFile) 
                 return null;  
             seek(fd, 0, SET);
             flag = Inode.READ;
@@ -80,16 +80,16 @@
             fte.inode.flag = flag;
         }
         //Allocate hard drive space for the file if its new
-        if (new_file) {
+        if (newFile) {
             //assign a direct block to it
-            int direct_block = superBlock.claimBlock();
-            if (direct_block == ERROR)
+            short directBlock = superBlock.claimBlock();
+            if (directBlock == ERROR)
             {
                 return null; //Not enough space for a direct block
             }
 
 
-            fte.inode.addBlock(direct_block);
+            fte.inode.addBlock(directBlock);
             fte.inode.toDisk(fte.iNumber); 
         }
         return fte;
@@ -99,7 +99,7 @@
     {
         FileTableEntry fte = null;
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getfte(fd);
+            fte = myTcb.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         int bytesRead = 0;
@@ -152,7 +152,7 @@
                         }
 
                         bufsize = bufsize + readLength - 1; // Shrink bufsize to
-                        seek(fte, readLength, CUR);
+                        seek(fd, readLength, CUR);
                     }
 
                 // Decrement count, if necessary
@@ -171,7 +171,7 @@
     {
         FileTableEntry fte = null;
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getfte(fd);
+            fte = myTcb.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
@@ -200,7 +200,7 @@
                     short inodeOffset;
                     while (bytesWritten < buffer.length)
                     {
-                        inodeOffset = fte.seekPtr / Disk.blockSize;
+                        inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
                         if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
                         {
                             // Grab a free block for the index.
@@ -225,7 +225,7 @@
 
                             //Set this new block in the inode so it knows 
                             //where the rest of the file will go
-                            if (!(fte.inode.setNextBlockNumber(block)))
+                            if (!(fte.inode.addBlock(block)))
                             {
                                 return ERROR;
                             }
@@ -272,7 +272,7 @@
     {
         FileTableEntry fte = null;
         if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getfte(fd);
+            fte = myTcb.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         // If the file has an open on it, close the open.
@@ -284,7 +284,7 @@
         {
             fte.inode.flag = Inode.USED;
             fte.inode.toDisk(fte.iNumber);
-            return filetable.ffree(fte) ? 0 : ERROR;
+            return fileTable.ffree(fte) ? 0 : ERROR;
         }
         return 0;
     }
@@ -299,7 +299,10 @@
 
     public int seek(int fd, int offset, int whence)
     {
-        int seek = ftEnt.seekPtr;
+        FileTableEntry fte;
+        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
+            fte = myTcb.getFtEnt(fd);
+        int seek = fte.seekPtr;
         switch(whence)
         {
             case SET: 
@@ -309,7 +312,7 @@
                 seek += offset;
                 break;
             case END: 
-                seek = fsize(ftEnt) + offset;
+                seek = fsize(fte) + offset;
                 break;
             default:
                 return -1;
@@ -318,14 +321,14 @@
             return -1;
         }
         //set the seek pointer in the entry
-        ftEnt.seekPtr = seek;
-        return ftEnt.seekPtr;
+        fte.seekPtr = seek;
+        return fte.seekPtr;
     }
 
     public int format(int files)
     {
         if (files > 0){
-            superblock.format(files);
+            superBlock.format(files);
             //directory = new Directory(files);
             //filetable = new FileTable(directory);
             return 0;
@@ -335,13 +338,13 @@
 
     public synchronized int delete(String filename)
     {
-        int iNumber = directory.namei(filename);
+        short iNumber = directory.namei(filename);
         if (iNumber == ERROR) return ERROR;
 
         Inode inode = new Inode(iNumber);
         // Flag block for deletion.
         inode.flag = Inode.DELETE;
-        if (!directory.ifree((short)iNumber)) return ERROR;
+        if (!directory.ifree(iNumber)) return ERROR;
         inode.count = 0;
         inode.flag = Inode.UNUSED;
         inode.toDisk(iNumber);
@@ -354,7 +357,7 @@
         Vector<Short> blocksFreed = new Vector<Short>();
 
         // Clear direct blocks.
-        for (int i = 0; i < directSize; i++)
+        for (int i = 0; i < Inode.directSize; i++)
         {
             if (fte.inode.direct[i] > 0)
             {
@@ -365,7 +368,7 @@
 
         // Read in the indirect block.
         byte[] indirectBlock = new byte[Disk.blockSize];
-        SysLib.rawread(indirect, indirectBlock);
+        SysLib.rawread(fte.inode.indirect, indirectBlock);
 
         // Clear all blocks pointed to by the indirect block.
         for (int i = 0; i < Disk.blockSize / 2; i++)
@@ -382,12 +385,12 @@
         }
 
         //Write the now zeroed indirect block back to disk
-        SysLib.rawwrite(indirect, indirectBlock);
-        toDisk(iNumber);
+        SysLib.rawwrite(fte.inode.indirect, indirectBlock);
+        toDisk(fte.iNumber);
 
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
-            superblock.returnBlock((int)blocksFreed.elementAt(i));
+            superBlock.returnBlock((int)blocksFreed.elementAt(i));
 
         return true;
     }
@@ -397,7 +400,7 @@
         if (seekPtr / Disk.blockSize < 0)
             return -1;
         else if (seekPtr / Disk.blockSize < inode.directSize)
-            return inode.direct[offset];
+            return inode.direct[seekPtr / Disk.blockSize];
 
         byte[] indirectBlock = new byte[Disk.blockSize];
         SysLib.rawread(inode.indirect, indirectBlock);

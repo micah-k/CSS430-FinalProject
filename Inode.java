@@ -1,8 +1,9 @@
 import java.util.*;
 
 public class Inode {
-    private final static int iNodeSize = 32;        // fix to 32 bytes
-    private final static int directSize = 11;       // # direct pointers
+    public final static int iNodeSize = 32;        // fix to 32 bytes
+    public final static int directSize = 11;       // # direct pointers
+    // Changed to public; why would final static variables need to be private?
 
     public int length;                              // file size in bytes
     public short count;                             // # file-table entries pointing to this
@@ -90,7 +91,7 @@ public class Inode {
         // No space in direct; try indirect next.
         byte[] data = new byte[Disk.blockSize];
         SysLib.rawread(indirect, data);
-        for(short offset = 0; offset < indirectSize *2; offset += 2)
+        for(short offset = 0; offset < Disk.blockSize; offset += 2)
         {
             //The next free indirect will be -1
             if (SysLib.bytes2short(data, offset) <= 0)
