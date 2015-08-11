@@ -74,7 +74,7 @@ public class FileStructureTable
   
     public synchronized FileTableEntry getFtEnt(int i)
     {
-        if (i >= 0 && i < table.size()) return table.elementAt(i);
+        if (i > 1 && i < table.size() + 2) return table.elementAt(i-2); //First two fds in TCB aren't stored in file table.
         return null;
     }
   
@@ -83,7 +83,7 @@ public class FileStructureTable
         for (int i = 0; i < table.size(); i++)
         {
             if (table.elementAt(i) == fte)
-                return i;
+                return i + 2; //First two fds in TCB aren't stored in file table.
         }
         return -1;
     }
