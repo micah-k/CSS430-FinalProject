@@ -103,6 +103,7 @@
                     break; // Let's try this again.
                 case Inode.UNUSED:
                 case Inode.DELETE: // Y u do dis.
+                    SysLib.cout("File unused or marked for deletion. ");
                     loop = false;
                     break;
                 default: // UNUSED, USED, READ
@@ -135,10 +136,18 @@
             int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
 
             // Error check,
-            if (block == ERROR) return ERROR;
+            if (block == ERROR)
+            {
+                SysLib.cout("Could not find block from seek ptr (" + fte.seekPtr + "). ");
+                return ERROR;
+            }
 
             //Read from disk,
-            if (SysLib.rawread(block, data) == ERROR) return ERROR;
+            if (SysLib.rawread(block, data) == ERROR)
+            {
+                SysLib.cout("Error reading block (" + block + "). ");
+                return ERROR;
+            }
 
             // If last block isn't entirely full, dont read all of it.
             boolean lastBlock = (fte.inode.length - fte.seekPtr) < Disk.blockSize ||
