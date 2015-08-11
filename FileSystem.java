@@ -22,9 +22,7 @@
 
         // Open the base directory file from the disk.
         FileTableEntry dir = open("/", "r");
-        int fd;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fd = myTcb.getFd(dir);
+        int fd = fileTable.getFd(dir);
 
         // Check for data in the directory.
         int dirSize = fsize(fd);
@@ -44,9 +42,7 @@
         //new file if one does not exist
         boolean newFile = directory.namei(filename) == -1;
         FileTableEntry fte = fileTable.falloc(filename, mode);
-        int fd;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fd = myTcb.getFd(fte);
+        int fd = fileTable.getFd(fte);
         short flag;
 
         // Can't use a switch statement because Strings compare diferently.
@@ -97,9 +93,7 @@
 
     public synchronized int read(int fd, byte[] buffer)
     {
-        FileTableEntry fte = null;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getFtEnt(fd);
+        FileTableEntry fte = fileTable.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         int bytesRead = 0;
@@ -169,9 +163,7 @@
 
     public synchronized int write(int fd, byte[] buffer)
     {
-        FileTableEntry fte = null;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getFtEnt(fd);
+        FileTableEntry fte = fileTable.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
@@ -265,9 +257,7 @@
 
     public synchronized int close(int fd)
     {
-        FileTableEntry fte = null;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getFtEnt(fd);
+        FileTableEntry fte = fileTable.getFtEnt(fd);
         if(fte == null) return ERROR;
 
         // If the file has an open on it, close the open.
@@ -286,17 +276,15 @@
 
     public int fsize(int fd)
     {
-        FileTableEntry fte;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            return myTcb.getFtEnt(fd).inode.length;
-        return ERROR;
+        FileTableEntry fte = fileTable.getFtEnt(fd);
+        if(fte == null) return ERROR;
+        return fte.inode.length;
     }
 
     public int seek(int fd, int offset, int whence)
     {
-        FileTableEntry fte;
-        if((myTcb = Kernel.scheduler.getMyTcb()) != null)
-            fte = myTcb.getFtEnt(fd);
+        FileTableEntry fte = fileTable.getFtEnt(fd);
+        if(fte == null) return ERROR;
         int seek = fte.seekPtr;
         switch(whence)
         {
@@ -324,8 +312,8 @@
     {
         if (files > 0){
             superBlock.format(files);
-            //directory = new Directory(files);
-            //filetable = new FileTable(directory);
+            directory = new Directory(files);
+            fileTable = new FileStructureTable(directory);
             return 0;
         }
         return -1;
