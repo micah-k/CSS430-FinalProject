@@ -24,17 +24,17 @@
         FileTableEntry dir = open("/", "r");
 
         // Check for data in the directory.
-        int dirSize = fte.inode.length;
+        int dirSize = dir.inode.length;
         if (dirSize > 0)
         {
             // If data has been stored, read it in.
             byte[] data = new byte[dirSize];
-            readFromFtEnt(fte, data);
+            readFromFtEnt(dir, data);
             directory.bytes2directory(data);
         }
-        fte.inode.flag = Inode.USED;
-        fte.inode.toDisk(fte.iNumber);
-        return fileTable.ffree(fte) ? 0 : ERROR;
+        dir.inode.flag = Inode.USED;
+        dir.inode.toDisk(dir.iNumber);
+        fileTable.ffree(dir);
     }
 
     public FileTableEntry open(String filename, String mode)
@@ -48,7 +48,7 @@
         // Can't use a switch statement because Strings compare diferently.
         if (mode.equals("a"))
         {
-            fte.seekPtr = fte.inode.length;
+            fte.seekPtr = fte.inode.length; // Can't use seek in open, because no fd exists yet.
             flag = Inode.WRITE;
         }
         else if (mode.equals("w"))
@@ -168,7 +168,7 @@
             }
 
             cpyStart = cpyStart + readLength - 1;
-            seek(fd, readLength, CUR);
+            fte.seekPtr += readLength; // Can't use seek because fd may not exist yet if we're being called from the constructor.
         }
 
         return bytesRead;
