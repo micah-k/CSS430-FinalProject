@@ -135,6 +135,7 @@
         while (bytesRead < buffer.length) // While there's space in the buffer to read into,
         {
             iteration++;
+            SysLib.cout("Iteration (" + iteration + "). ");
             int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
 
             // Error check,
