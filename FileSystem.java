@@ -86,7 +86,7 @@
         FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
-            SysLib.cout("Invalid file descriptor (" + fd + "). ");
+            SysLib.cout("Read: Invalid file descriptor (" + fd + "). ");
             return ERROR;
         }
 
@@ -180,7 +180,7 @@
         FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
-            SysLib.cout("Invalid file descriptor (" + fd + "). ");
+            SysLib.cout("Write: Invalid file descriptor (" + fd + "). ");
             return ERROR;
         }
 
@@ -305,7 +305,11 @@
     public synchronized int close(int fd)
     {
         FileTableEntry fte = convertFdToFtEnt(fd);
-        if(fte == null) return ERROR; // UNUSED, DELETE
+        if(fte == null)
+        {
+            SysLib.cout("Close: Invalid file descriptor (" + fd + "). ");
+            return ERROR; // UNUSED, DELETE
+        }
 
         // If the file has an open on it, wait for it to finish.
         while(fte.count > 1)
