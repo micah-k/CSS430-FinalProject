@@ -259,13 +259,13 @@
                     fte.inode.indirect = index;
                 }
 
-                short newBlock = superBlock.claimBlock();
-                if (newBlock == ERROR)
+                block = superBlock.claimBlock();
+                if (block == ERROR)
                 {
                     SysLib.cout("No available free blocks for new memory block. ");
                     return ERROR;
                 }
-                fte.inode.addBlock(newBlock);
+                fte.inode.addBlock(block);
             }
 
 
