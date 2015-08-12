@@ -332,6 +332,7 @@
             SysLib.cout("COUNT EQUALS 1 BUT FLAG NOT SET TO USED IN CLOSE. ");
         }
 
+        SysLib.cout("Closing fd (" + fd + "). ");
         // Flag and write the file to disk.
         return fileTable.ffree(fte) ? 0 : ERROR;
     }
