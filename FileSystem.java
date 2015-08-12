@@ -239,18 +239,18 @@
 
     private synchronized int writeFromFtEnt(FileTableEntry fte, byte[] buffer)
     {
-        short block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+        short block;
         int bytesWritten = 0;
         int blockOffset = fte.seekPtr % Disk.blockSize;
         byte[] data = new byte[Disk.blockSize];
         short inodeOffset;
         int iteration = 0;
-        
+
         while (bytesWritten < buffer.length)
         {
             iteration++;
             SysLib.cout("Iteration (" + iteration + "). ");
-            int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+            block = blockFromSeekPtr(fte.seekPtr, fte.inode);
             inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
             if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
             {
