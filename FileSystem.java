@@ -161,7 +161,7 @@
             readLength = (lastBlock ? remainingBytes : bytesAvailable);
             SysLib.cout("Read length (" + readLength + "). ");
 
-            int bytesToRead = (buffer.length - bytesRead) < readLength ? (buffer.length - bytesRead) : readLength
+            int bytesToRead = (buffer.length - bytesRead) < readLength ? (buffer.length - bytesRead) : readLength;
 
             System.arraycopy(data, offset, buffer, cpyStart, bytesToRead);
 
@@ -247,7 +247,7 @@
 
             if(block == ERROR) // If no block has been allocated in the next slot, go make one.
             {
-                int seekBlock = seekPtr / Disk.blockSize;
+                int seekBlock = fte.seekPtr / Disk.blockSize;
                 if(seekBlock >= fte.inode.directSize && fte.inode.indirect <= 0)
                 {
                     short index = superBlock.claimBlock();
@@ -260,7 +260,7 @@
                 }
 
                 short newBlock = superBlock.claimBlock();
-                if (index == ERROR)
+                if (newBlock == ERROR)
                 {
                     SysLib.cout("No available free blocks for new memory block. ");
                     return ERROR;
