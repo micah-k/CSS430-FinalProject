@@ -321,7 +321,7 @@
         }
 
         // If the file has an open on it, wait for it to finish.
-        while(fte.count > 1 &&(fte.inode.flag == READ || fte.inode.flag == WRITE))
+        while(fte.count > 1 &&(fte.inode.flag == Inode.READ || fte.inode.flag == Inode.WRITE))
         {
             SysLib.cout("fte.count (" + fte.count + "). Flag (" + fte.inode.flag + "). ");
             try { wait(); } catch (InterruptedException e){}
