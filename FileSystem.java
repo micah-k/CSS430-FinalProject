@@ -270,6 +270,7 @@
 
             // Variable used multiple times; copy to local to prevent excess aritmetic.
             int remainingBytes = buffer.length - bytesWritten;
+            SysLib.cout("Remaining bytes (" + remainingBytes + "). ");
 
             // If the next block doesn't exist, claim a free block to fill.
             if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
@@ -298,6 +299,7 @@
             // Write one block from the buffer. If there's less than a block left to write in the buffer, just fill the remaining space.
             int writeLength = ((remainingBytes < (Disk.blockSize - blockOffset)) ? remainingBytes : (Disk.blockSize - blockOffset));
             System.arraycopy(buffer, bytesWritten, data, blockOffset, writeLength);
+            SysLib.cout("Write length (" + writeLength + "). ");
             
             // Save the block,
             SysLib.rawwrite(block, data);
