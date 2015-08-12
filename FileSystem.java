@@ -261,7 +261,7 @@
 
                     byte[] testdata = new byte[Disk.blockSize];
                     SysLib.rawread(index, testdata);
-                    SysLib.cout("Second pointer in indirect block:" + SysLib.bytes2short(testdata, 2) + "). ");
+                    SysLib.cout("First four pointers in indirect block:" + SysLib.bytes2short(testdata, 0) + ", " + SysLib.bytes2short(testdata, 2) + ", " + SysLib.bytes2short(testdata, 4) + ", " + SysLib.bytes2short(testdata, 6) + ", ");
                 }
 
                 block = superBlock.claimBlock();
