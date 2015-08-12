@@ -111,7 +111,7 @@ public class Inode {
             byte[] data = new byte[Disk.blockSize];
             SysLib.rawread(indirect, data);
 
-            short indirectBlock = SysLib.bytes2short(data, seekBlock - directSize);
+            short indirectBlock = SysLib.bytes2short(data, (seekBlock - directSize) * 2);
             if(indirectBlock == 0)
             {
                 SysLib.cout("Bad indirect pointer. ");
