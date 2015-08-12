@@ -51,7 +51,7 @@
         else if (mode.equals("w"))
         {
             fte.seekPtr = 0;
-            deallocAllBlocks(fte);
+            deallocAllBlocks(fte.inode);
             newFile = true;
         }
         else if (mode.equals("w+"))
@@ -390,7 +390,7 @@
             try { wait(); } catch (InterruptedException e){}            
         }
 
-        directory.ifree(iNumber)
+        directory.ifree(iNumber);
         inode.count = 0;
         inode.length = 0;
         inode.flag = Inode.UNUSED;
@@ -435,7 +435,7 @@
             inode.indirect = -1;
         }
 
-        inode.toDisk(fte.iNumber);
+        inode.toDisk(iNumber);
 
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
