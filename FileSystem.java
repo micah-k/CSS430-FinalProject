@@ -92,6 +92,7 @@
         boolean loop = true;
         int bytesRead = ERROR;
         fte.count++;
+        SysLib.cout("fte.count (" + fte.count + "). ");
 
         while (loop)
         {
@@ -119,7 +120,8 @@
             }
         }
 
-        fte.count--;                    
+        fte.count--;   
+        SysLib.cout("fte.count (" + fte.count + "). ");                 
         return bytesRead;
     }
 
@@ -190,6 +192,7 @@
 
         int bytesWritten = ERROR;
         fte.count++;
+        SysLib.cout("fte.count (" + fte.count + "). ");
         boolean loop = true;
 
         while (loop)
@@ -217,10 +220,12 @@
                     if (fte.seekPtr >= fte.inode.length)
                     {
                         // Seek ptr is at end of file, becomes new length.
+                        SysLib.cout("Seek Ptr past EOF; disk update required. ");
                         fte.inode.length = fte.seekPtr;
                         fte.inode.toDisk(fte.iNumber);
                     }
 
+                    SysLib.cout("Changing flag back to USED. ");
                     fte.inode.flag = Inode.USED;
                     if (fte.count > 0) notifyAll(); // Notify waiting threads, if they exist.
                     loop = false;
@@ -228,6 +233,7 @@
         }
 
         fte.count--;
+        SysLib.cout("fte.count (" + fte.count + "). ");
         return bytesWritten;
     }
 
@@ -317,6 +323,7 @@
         // If the file has an open on it, wait for it to finish.
         while(fte.count > 1)
         {
+            SysLib.cout("fte.count (" + fte.count + "). ");
             try { wait(); } catch (InterruptedException e){}
         }
 
