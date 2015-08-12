@@ -323,9 +323,8 @@
         // If the file has an open on it, wait for it to finish.
         while(fte.count > 1)
         {
-            SysLib.cout("fte.count (" + fte.count + "). ");
+            SysLib.cout("fte.count (" + fte.count + "). Flag (" + fte.inode.flag + "). ");
             try { wait(); } catch (InterruptedException e){}
-            fte = convertFdToFtEnt(fd);
         }
 
         if(fte.inode.flag != Inode.USED)
