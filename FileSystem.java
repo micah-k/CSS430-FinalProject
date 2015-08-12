@@ -291,6 +291,7 @@
             
             // Save the block,
             SysLib.rawwrite(block, data);
+            SysLib.cout("Raw write complete. ");
 
             // Next contestant.
             bytesWritten += writeLength;
