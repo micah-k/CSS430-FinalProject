@@ -249,7 +249,7 @@
         while (bytesWritten < buffer.length)
         {
             iteration++;
-            SysLib.cout("Iteration (" + iteration + "). ");
+            SysLib.cout("\nIteration (" + iteration + "). ");
             block = blockFromSeekPtr(fte.seekPtr, fte.inode);
             inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
             if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
