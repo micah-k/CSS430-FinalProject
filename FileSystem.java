@@ -275,6 +275,8 @@
             // If the next block doesn't exist, claim a free block to fill.
             if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
             {
+                if (block == ERROR)
+                    SysLib.cout("Block error; freeing block. ");
                 block = superBlock.claimBlock();
                 // No free blocks?
                 if (block == ERROR)
