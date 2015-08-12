@@ -395,7 +395,6 @@
         inode.length = 0;
         inode.flag = Inode.UNUSED;
         deallocAllBlocks(inode);
-        inode.toDisk(iNumber);
         return 0;
     }
 
@@ -435,7 +434,7 @@
             inode.indirect = -1;
         }
 
-        inode.toDisk(iNumber);
+        inode.toDisk(inode.iNumber);
 
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
