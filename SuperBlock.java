@@ -70,7 +70,6 @@ class SuperBlock {
     public short claimBlock()
     {
         int result = freeList;                  // Save the current head index
-        
         byte[] data = new byte[Disk.blockSize]; // Read in the data from the first free block
         SysLib.rawread(freeList, data);
 
@@ -82,6 +81,8 @@ class SuperBlock {
 
         sync();                                 // Superblock has changed; update disk.
 
+        SysLib.cout("Freed block (" + result + "). ");
+        SysLib.cout("Next free block (" + freeList + "). ");
         return (short)result;                          // Return the index.
     }
 
