@@ -80,9 +80,7 @@ class SuperBlock {
         SysLib.rawwrite(result, data);          // Write back the cleared file.
 
         sync();                                 // Superblock has changed; update disk.
-
-        SysLib.cout("Claimed block (" + result + "). ");
-        SysLib.cout("Next free block (" + freeList + "). ");
+        
         return (short)result;                          // Return the index.
     }
 

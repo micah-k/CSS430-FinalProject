@@ -85,14 +85,12 @@
         FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
-            SysLib.cout("Read: Invalid file descriptor (" + fd + "). ");
             return ERROR;
         }
 
         boolean loop = true;
         int bytesRead = ERROR;
         fte.count++;
-        SysLib.cout("fte.count (" + fte.count + "). ");
 
         while (loop)
         {
@@ -103,7 +101,6 @@
                     break; // Let's try this again.
                 case Inode.UNUSED:
                 case Inode.DELETE: // Y u do dis.
-                    SysLib.cout("File unused or marked for deletion. ");
                     loop = false;
                     break;
                 default: // UNUSED, USED, READ
@@ -120,8 +117,7 @@
             }
         }
 
-        fte.count--;   
-        SysLib.cout("fte.count (" + fte.count + "). ");                 
+        fte.count--;               
         return bytesRead;
     }
 
@@ -136,20 +132,17 @@
         while (bytesRead < buffer.length && fte.seekPtr < fte.inode.length) // While there's space in the buffer to read into,
         {
             iteration++;
-            SysLib.cout("Iteration (" + iteration + "). ");
             int block = fte.inode.blockFromSeekPtr(fte.seekPtr);
 
             // Error check,
             if (block == ERROR)
             {
-                SysLib.cout("Could not find block from seek ptr (" + fte.seekPtr + ") in iteration (" + iteration + "). ");
                 return ERROR;
             }
 
             //Read from disk,
             if (SysLib.rawread(block, data) == ERROR)
             {
-                SysLib.cout("Error reading block (" + block + "). ");
                 return ERROR;
             }
 
@@ -159,9 +152,7 @@
             // If last block isn't entirely full, dont read all of it.
             int remainingBytes = fte.inode.length - fte.seekPtr;
             boolean lastBlock = remainingBytes <= bytesAvailable;
-            SysLib.cout("Last block (" + (lastBlock ? "true" : "false") + "). ");
             readLength = (lastBlock ? remainingBytes : bytesAvailable);
-            SysLib.cout("Read length (" + readLength + "). ");
 
             int bytesToRead = (buffer.length - bytesRead) < readLength ? (buffer.length - bytesRead) : readLength;
 
@@ -180,19 +171,16 @@
         FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
-            SysLib.cout("Write: Invalid file descriptor (" + fd + "). ");
             return ERROR;
         }
 
         if(fte.mode.equals("r"))
         {
-            SysLib.cout("Cannot write in read mode. ");
             return ERROR;
         }
 
         int bytesWritten = ERROR;
         fte.count++;
-        SysLib.cout("fte.count (" + fte.count + "). ");
         boolean loop = true;
 
         while (loop)
@@ -206,7 +194,6 @@
                     break; // Let's try this again.
                 case Inode.DELETE:
                 case Inode.UNUSED:
-                    SysLib.cout("Inode deleted. ");
                     loop = false;
                     break;
                 default: // USED
@@ -220,12 +207,10 @@
                     if (fte.seekPtr >= fte.inode.length)
                     {
                         // Seek ptr is at end of file, becomes new length.
-                        SysLib.cout("Seek Ptr past EOF; disk update required. ");
                         fte.inode.length = fte.seekPtr;
                         fte.inode.toDisk(fte.iNumber);
                     }
 
-                    SysLib.cout("Changing flag back to USED. ");
                     fte.inode.flag = Inode.USED;
                     if (fte.count > 0) notifyAll(); // Notify waiting threads, if they exist.
                     loop = false;
@@ -233,7 +218,6 @@
         }
 
         fte.count--;
-        SysLib.cout("fte.count (" + fte.count + "). ");
         return bytesWritten;
     }
 
@@ -248,7 +232,6 @@
         while (bytesWritten < buffer.length)
         {
             iteration++;
-            SysLib.cout("\nIteration (" + iteration + "). ");
             block = fte.inode.blockFromSeekPtr(fte.seekPtr);
 
             if(block == ERROR) // If no block has been allocated in the next slot, go make one.
@@ -259,55 +242,41 @@
                     short index = superBlock.claimBlock();
                     if (index == ERROR)
                     {
-                        SysLib.cout("No available free blocks for indirect index. ");
                         return ERROR;
                     }
                     fte.inode.indirect = index;
-                    SysLib.cout("Claimed (" + index + ") for indirect index. ");
 
-                    byte[] testdata = new byte[Disk.blockSize];
-                    SysLib.rawread(index, testdata);
-                    SysLib.cout("First four pointers in indirect block:" + SysLib.bytes2short(testdata, 0) + ", " + SysLib.bytes2short(testdata, 2) + ", " + SysLib.bytes2short(testdata, 4) + ", " + SysLib.bytes2short(testdata, 6) + ", ");
                 }
 
                 block = superBlock.claimBlock();
                 if (block == ERROR)
                 {
-                    SysLib.cout("No available free blocks for new memory block. ");
                     return ERROR;
                 }
                 fte.inode.addBlock(block);
-                SysLib.cout("Claimed block (" + block + "). ");
             }
 
 
 
             // Variable used multiple times; copy to local to prevent excess aritmetic.
             int remainingBytes = buffer.length - bytesWritten;
-            SysLib.cout("Remaining bytes (" + remainingBytes + "). ");
     
             // Load the block,
-            SysLib.cout("Loading block (" + block + "). ");
             SysLib.rawread(block, data);
 
             // Write one block from the buffer. If there's less than a block left to write in the buffer, just fill the remaining space.
             int writeLength = ((remainingBytes < (Disk.blockSize - blockOffset)) ? remainingBytes : (Disk.blockSize - blockOffset));
             System.arraycopy(buffer, bytesWritten, data, blockOffset, writeLength);
-            SysLib.cout("Write length (" + writeLength + "). ");
             
             // Save the block,
             SysLib.rawwrite(block, data);
-            SysLib.cout("Raw write complete. ");
 
             // Next contestant.
             bytesWritten += writeLength;
             fte.seekPtr += writeLength;
             // Block offset starts at 0 for new blocks.
             blockOffset = 0;
-            SysLib.cout("Bytes written (" + bytesWritten + ") , Buffer length (" + buffer.length + "). ");
         }
-
-        SysLib.cout("Returning (" + bytesWritten + "). ");
         return bytesWritten;
     }
 
@@ -316,28 +285,14 @@
         FileTableEntry fte = convertFdToFtEnt(fd);
         if(fte == null)
         {
-            SysLib.cout("Close: Invalid file descriptor (" + fd + "). ");
             return ERROR; // UNUSED, DELETE
         }
 
         // If the file has an open on it, wait for it to finish.
-        while(fte.count > 1 &&(fte.inode.flag == Inode.READ || fte.inode.flag == Inode.WRITE))
+        while(fte.count > 1 && (fte.inode.flag == Inode.READ || fte.inode.flag == Inode.WRITE))
         {
-            SysLib.cout("fte.count (" + fte.count + "). Flag (" + fte.inode.flag + "). ");
             try { wait(); } catch (InterruptedException e){}
         }
-
-        if(fte.count > 1)
-        {
-            SysLib.cout("FLAG SET TO USED BUT COUNT GREATER THAN 1 IN CLOSE. ");
-        }
-
-        if(fte.inode.flag != Inode.USED)
-        {
-            SysLib.cout("COUNT EQUALS 1 BUT FLAG NOT SET TO USED IN CLOSE. ");
-        }
-
-        SysLib.cout("Closing fd (" + fd + "). ");
         // Flag and write the file to disk.
         return fileTable.ffree(fte) ? 0 : ERROR;
     }

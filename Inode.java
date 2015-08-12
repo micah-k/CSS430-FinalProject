@@ -87,14 +87,12 @@ public class Inode {
             return ERROR;
 
         short seekBlock = (short)(seekPtr / Disk.blockSize);
-        SysLib.cout("Seek block: (" + seekBlock + ") ");
 
         if (seekBlock < directSize)
         {
             short directBlock = direct[seekBlock];
             if(directBlock == ERROR)
             {
-                SysLib.cout("No direct block here. ");
                 return ERROR;
             }
             return directBlock;
@@ -104,7 +102,6 @@ public class Inode {
         {
             if(indirect == ERROR)
             {
-                SysLib.cout("No indirect block. ");
                 return ERROR;
             }
 
@@ -114,7 +111,6 @@ public class Inode {
             short indirectBlock = SysLib.bytes2short(data, (seekBlock - directSize) * 2);
             if(indirectBlock == 0)
             {
-                SysLib.cout("Bad indirect pointer. ");
                 return ERROR;
             }
             return indirectBlock;
