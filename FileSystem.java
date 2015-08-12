@@ -292,6 +292,7 @@
             }
     
             // Load the block,
+            SysLib.cout("Loading block (" + block + "). ");
             SysLib.rawread(block, data);
 
             // Write one block from the buffer. If there's less than a block left to write in the buffer, just fill the remaining space.
