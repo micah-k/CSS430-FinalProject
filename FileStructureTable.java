@@ -29,6 +29,7 @@ public class FileStructureTable
         {      
             iNumber = dir.ialloc(filename); // Create file
             inode = new Inode();
+            inode.iNumber = iNumber;
         }
 
         inode.count++; // Add a reference to this file

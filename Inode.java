@@ -10,6 +10,9 @@ public class Inode {
     public short flag;                              // 0 = unused, 1 = used, ...
     public short direct[] = new short[directSize];  // direct pointers
     public short indirect;                          // a indirect pointer
+    public short iNumber;
+
+    public static final int ERROR = -1;
 
     public final static short UNUSED = 0;           // Flag preset codes for Inode.
     public final static short USED = 1;
@@ -30,6 +33,8 @@ public class Inode {
     // Retrieve Inode from disk.
     public Inode(short iNumber)
     {
+        this.iNumber = iNumber;
+        
         int block = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
 
         byte[] inodeData = new byte[Disk.blockSize]; // In computer development there is no way to read a portion of a block from, or write a portion to, the disk.
@@ -89,19 +94,22 @@ public class Inode {
         }
 
         // No space in direct; try indirect next.
-        byte[] data = new byte[Disk.blockSize];
-        SysLib.rawread(indirect, data);
-        for(short offset = 0; offset < Disk.blockSize; offset += 2)
+        if(indirect != ERROR)
         {
-            //The next free indirect will be -1
-            if (SysLib.bytes2short(data, offset) <= 0)
+            byte[] data = new byte[Disk.blockSize];
+            SysLib.rawread(indirect, data);
+            for(short offset = 0; offset < Disk.blockSize; offset += 2)
             {
-                //write the block number to the byte array
-                SysLib.short2bytes(block, data, offset);
-                //write the block back to disk return success condition on disk
-                return SysLib.rawwrite(indirect, data);
+                //The next free indirect will be -1
+                if (SysLib.bytes2short(data, offset) <= 0)
+                {
+                    //write the block number to the byte array
+                    SysLib.short2bytes(block, data, offset);
+                    //write the block back to disk return success condition on disk
+                    return SysLib.rawwrite(indirect, data);
+                }
             }
         }
-        return -1;
+        return ERROR;
     }
 }

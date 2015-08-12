@@ -34,11 +34,10 @@ class SuperBlock {
         SysLib.int2bytes(totalInodes, data, 4);
         SysLib.int2bytes(freeList, data, 8);
 
-        // Write the local superblock to the disk.
+        // Save the superblock to the disk.
         SysLib.rawwrite(0, data);
 
         // Reset local superblock to save on data costs. Negligible issue on modern computers, but a good habit to have for more memory-intensive situations.
-        data = new byte[512];
         for (int i = freeList; i < totalBlocks; i++)
         {
             // Fill block with 0.
@@ -70,45 +69,34 @@ class SuperBlock {
     // Take a free block from the freelist
     public short claimBlock()
     {
-        int result = freeList;                  // Save the current head pointer
+        int result = freeList;                  // Save the current head index
         
         byte[] data = new byte[Disk.blockSize]; // Read in the data from the first free block
         SysLib.rawread(freeList, data);
 
-        freeList = SysLib.bytes2int(data, 0);   // Move the head pointer to the next space.
+        freeList = SysLib.bytes2int(data, 0);   // Move the head index to the next space.
 
-        SysLib.int2bytes(0, data, 0);           // Clear the pointer after it's been copied out.
+        SysLib.int2bytes(0, data, 0);           // Clear the index after it's been copied out.
 
         SysLib.rawwrite(result, data);          // Write back the cleared file.
 
         sync();                                 // Superblock has changed; update disk.
 
-        return (short)result;                          // Return the pointer.
+        return (short)result;                          // Return the index.
     }
 
-    // Return a block to the freelist
+    // Return a block to head of freelist
     public void returnBlock(int blockNumber)
     {
-        int curBlock = freeList;           // Start pointer at head of freelist
-        int nextBlock;                       // Does not need to be initialized yet.
         byte[] data = new byte[512];        // Byte array of data for transfer.
+        for(int i = 0; i < Disk.blockSize; i++)
+        {
+            data[i] = (byte)0;
+        }
 
-        SysLib.rawread(blockNumber, data);  // Read in returned block.
-        SysLib.int2bytes(0, data, 0);       // Clear first 4 bytes; remaining bogus data need not be changed.
+        SysLib.int2bytes(freeList, data, 0);
         SysLib.rawwrite(blockNumber, data); // Write back returned block.
 
-        while (curBlock < totalBlocks)
-        {
-            SysLib.rawread(curBlock, data); // Read current block from freelist.
-            nextBlock = SysLib.bytes2int(data, 0); // Read in next free block address.
-            if (nextBlock == 0) // If next block pointer is null (list end)...
-            {
-                SysLib.int2bytes(blockNumber, data, 0); // Change pointer to point to returned block.
-                SysLib.rawwrite(curBlock, data); // Save to disk.
-                return;
-            }
-
-            curBlock = nextBlock; // Next contestant...
-        }
+        freeList = blockNumber;
     }
 }

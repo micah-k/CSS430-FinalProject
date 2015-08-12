@@ -33,7 +33,6 @@
             directory.bytes2directory(data);
         }
         dir.inode.flag = Inode.USED;
-        dir.inode.toDisk(dir.iNumber);
         fileTable.ffree(dir);
     }
 
@@ -328,7 +327,6 @@
         }
 
         // Flag and write the file to disk.
-        fte.inode.toDisk(fte.iNumber);
         return fileTable.ffree(fte) ? 0 : ERROR;
     }
 
@@ -387,70 +385,73 @@
 
         Inode inode = new Inode(iNumber);
 
-        while(inode.flag == Inode.READ || inode.flag == Inode.WRITE)
+        while(inode.count > 0)
         {
             try { wait(); } catch (InterruptedException e){}            
         }
-        // Flag block for deletion.
-        inode.flag = Inode.DELETE;
-        if (!directory.ifree(iNumber)) return ERROR;
+
+        directory.ifree(iNumber)
         inode.count = 0;
+        inode.length = 0;
         inode.flag = Inode.UNUSED;
+        deallocAllBlocks(inode);
         inode.toDisk(iNumber);
         return 0;
     }
 
 
-    private boolean deallocAllBlocks(FileTableEntry fte)
+    private void deallocAllBlocks(Inode inode)
     {
         Vector<Short> blocksFreed = new Vector<Short>();
 
         // Clear direct blocks.
         for (int i = 0; i < Inode.directSize; i++)
         {
-            if (fte.inode.direct[i] > 0)
+            if (inode.direct[i] > 0)
             {
-                blocksFreed.add(fte.inode.direct[i]);
-                fte.inode.direct[i] = -1;
+                blocksFreed.add(new Short(inode.direct[i]));
+                inode.direct[i] = -1;
             }
         }
 
-        // Read in the indirect block.
-        byte[] indirectBlock = new byte[Disk.blockSize];
-        SysLib.rawread(fte.inode.indirect, indirectBlock);
-
-        // Clear all blocks pointed to by the indirect block.
-        for (int i = 0; i < Disk.blockSize / 2; i++)
+        if(inode.indirect >= 0)
         {
-            short cur = SysLib.bytes2short(indirectBlock, i);
-            //If its a valid block, reset it and add it to the return vector
-            if (cur > 0)
+            // Read in the indirect block.
+            byte[] indirectBlock = new byte[Disk.blockSize];
+            SysLib.rawread(inode.indirect, indirectBlock);
+
+            // Clear all blocks pointed to by the indirect block.
+            for (int i = 0; i < Disk.blockSize / 2; i++)
             {
-                //write 0 to the index block at this pos to invalidate it
-                SysLib.int2bytes(0, indirectBlock, i);
-                //save it to the return vector
-                blocksFreed.add(new Short(cur));
+                short cur = SysLib.bytes2short(indirectBlock, i);
+                //If its a valid block, reset it and add it to the return vector
+                if (cur > 0)
+                {
+                    //save it to the return vector
+                    blocksFreed.add(new Short(cur));
+                }
             }
+            blocksFreed.add(new Short(inode.indirect));
+            inode.indirect = -1;
         }
 
-        //Write the now zeroed indirect block back to disk
-        SysLib.rawwrite(fte.inode.indirect, indirectBlock);
-        fte.inode.toDisk(fte.iNumber);
+        inode.toDisk(fte.iNumber);
 
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
             superBlock.returnBlock((int)blocksFreed.elementAt(i));
-
-        return true;
     }
 
     private short blockFromSeekPtr(int seekPtr, Inode inode)
     {
-        if (seekPtr / Disk.blockSize < 0)
-            return -1;
-        else if (seekPtr / Disk.blockSize < inode.directSize)
+        if (seekPtr < 0)
+            return ERROR;
+
+        int seekBlock = seekPtr / Disk.blockSize;
+
+        if (seekBlock < inode.directSize)
         {
-            short directBlock = inode.direct[seekPtr / Disk.blockSize];
+            short directBlock = inode.direct[seekBlock];
             if(directBlock == ERROR)
             {
                 directBlock = superBlock.claimBlock();
@@ -464,9 +465,29 @@
             return directBlock;
         }
 
-        byte[] indirectBlock = new byte[Disk.blockSize];
-        SysLib.rawread(inode.indirect, indirectBlock);
-        return SysLib.bytes2short(indirectBlock, seekPtr / Disk.blockSize - inode.directSize);
+        else
+        {
+            if(inode.indirect == ERROR)
+            {
+                inode.indirect = superBlock.claimBlock();
+            }
+
+            byte[] data = new byte[Disk.blockSize];
+            SysLib.rawread(inode.indirect, data);
+
+            short indirectBlock = SysLib.bytes2short(data, seekBlock - inode.directSize);
+            if(indirectBlock == 0)
+            {
+                indirectBlock = superBlock.claimBlock();
+                if (indirectBlock == ERROR)
+                {
+                    SysLib.cout("No free blocks! ");
+                    return ERROR;
+                }
+                inode.addBlock(indirectBlock);
+            }
+            return indirectBlock;
+        }
     }
 
     private FileTableEntry convertFdToFtEnt(int fd)
