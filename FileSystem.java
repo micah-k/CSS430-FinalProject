@@ -258,6 +258,10 @@
                     }
                     fte.inode.indirect = index;
                     SysLib.cout("Claimed (" + index + ") for indirect index. ");
+
+                    byte[] testdata = new byte[Disk.blockSize];
+                    SysLib.rawread(index, testdata);
+                    SysLib.cout("Second pointer in indirect block:" + SysLib.bytes2short(testdata, 2) + "). ");
                 }
 
                 block = superBlock.claimBlock();
