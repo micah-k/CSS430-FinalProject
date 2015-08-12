@@ -257,6 +257,7 @@
                         return ERROR;
                     }
                     fte.inode.indirect = index;
+                    SysLib.cout("Claimed (" + index + ") for indirect index. ");
                 }
 
                 block = superBlock.claimBlock();
@@ -266,6 +267,7 @@
                     return ERROR;
                 }
                 fte.inode.addBlock(block);
+                SysLib.cout("Claimed block (" + block + "). ");
             }
 
 
