@@ -125,17 +125,17 @@
 
     private synchronized int readFromFtEnt(FileTableEntry fte, byte[] buffer)
     {
-        byte[] data = new byte[Disk.blockSize];
+        byte[] data = new byte[512];
         int bytesRead = 0;
         int readLength = 0;
         int cpyStart = 0;
         int iteration = 0;
 
-        while (bytesRead < buffer.length) // While there's space in the buffer to read into,
+        while (bytesRead < buffer.length && fte.seekPtr < fte.inode.length) // While there's space in the buffer to read into,
         {
             iteration++;
             SysLib.cout("Iteration (" + iteration + "). ");
-            int block = blockFromSeekPtr(fte.seekPtr, fte.inode);
+            int block = fte.inode.blockFromSeekPtr(fte.seekPtr);
 
             // Error check,
             if (block == ERROR)
@@ -151,29 +151,23 @@
                 return ERROR;
             }
 
+            int offset = fte.seekPtr % Disk.blockSize;
+            int bytesAvailable = Disk.blockSize - offset;
+
             // If last block isn't entirely full, dont read all of it.
-            boolean lastBlock = (fte.inode.length - fte.seekPtr) < Disk.blockSize ||
-                                (fte.inode.length - fte.seekPtr) == 0;
+            int remainingBytes = fte.inode.length - fte.seekPtr;
+            boolean lastBlock = remainingBytes <= bytesAvailable;
             SysLib.cout("Last block (" + (lastBlock ? "true" : "false") + "). ");
-            readLength = (lastBlock ? (fte.inode.length - fte.seekPtr) : Disk.blockSize);
+            readLength = (lastBlock ? remainingBytes : bytesAvailable);
             SysLib.cout("Read length (" + readLength + "). ");
 
-            // Remaining data in one disk block,
-            if (buffer.length < (512 - fte.seekPtr))
-            {
-                System.arraycopy(data, fte.seekPtr, buffer, 0, buffer.length); // Copy into buffer,
-                bytesRead = buffer.length; //Increment read count,
-            }
+            int bytesToRead = (buffer.length - bytesRead) < readLength ? (buffer.length - bytesRead) : readLength
 
-            // Remaining data in multiple blocks,
-            else
-            {
-                System.arraycopy(data, 0, buffer, cpyStart, readLength); // Copy into buffer,
-                bytesRead += readLength; //Increment read count,
-            }
+            System.arraycopy(data, offset, buffer, cpyStart, bytesToRead);
 
-            cpyStart = cpyStart + readLength - 1;
-            fte.seekPtr += readLength; // Can't use seek because fd may not exist yet if we're being called from the constructor.
+            bytesRead += bytesToRead;
+            fte.seekPtr += bytesToRead;
+            cpyStart += bytesToRead;
         }
 
         return bytesRead;
@@ -237,62 +231,48 @@
         return bytesWritten;
     }
 
-    private synchronized int writeFromFtEnt(FileTableEntry fte, byte[] buffer)
+    private synchronized int writeFromFtEnt(FileTableEntry fte, byte[600] buffer)
     {
         short block;
         int bytesWritten = 0;
         int blockOffset = fte.seekPtr % Disk.blockSize;
         byte[] data = new byte[Disk.blockSize];
-        short inodeOffset;
         int iteration = 0;
 
         while (bytesWritten < buffer.length)
         {
             iteration++;
             SysLib.cout("\nIteration (" + iteration + "). ");
-            block = blockFromSeekPtr(fte.seekPtr, fte.inode);
-            inodeOffset = (short)(fte.seekPtr / Disk.blockSize);
-            if (inodeOffset >= Inode.directSize - 1 && fte.inode.indirect <= 0)
+            block = fte.inode.blockFromSeekPtr(fte.seekPtr);
+
+            if(block == ERROR) // If no block has been allocated in the next slot, go make one.
             {
-                // Grab a free block for the index.
-                short index = superBlock.claimBlock();
-                if (index == ERROR)
+                int seekBlock = seekPtr / Disk.blockSize;
+                if(seekBlock >= fte.inode.directSize && fte.inode.indirect <= 0)
                 {
-                    SysLib.cout("No available free blocks. ");
-                    return ERROR;
+                    short index = superBlock.claimBlock();
+                    if (index == ERROR)
+                    {
+                        SysLib.cout("No available free blocks for indirect index. ");
+                        return ERROR;
+                    }
+                    fte.inode.indirect = index;
                 }
 
-                // Set the indirect block.
-                fte.inode.indirect = index;
-                // Save to disk.
-                fte.inode.toDisk(fte.iNumber);
+                short newBlock = superBlock.claimBlock();
+                if (index == ERROR)
+                {
+                    SysLib.cout("No available free blocks for new memory block. ");
+                    return ERROR;
+                }
+                fte.inode.addBlock(newBlock);
             }
+
+
 
             // Variable used multiple times; copy to local to prevent excess aritmetic.
             int remainingBytes = buffer.length - bytesWritten;
             SysLib.cout("Remaining bytes (" + remainingBytes + "). ");
-
-            // If the next block doesn't exist, claim a free block to fill.
-            if (block == ERROR || (bytesWritten % Disk.blockSize > 0 && remainingBytes > 0))
-            {
-                if (block == ERROR)
-                    SysLib.cout("Block error; freeing block. ");
-                block = superBlock.claimBlock();
-                // No free blocks?
-                if (block == ERROR)
-                {
-                    SysLib.cout("No available free blocks. ");
-                    return ERROR;
-                }
-
-                if (fte.inode.addBlock(block) == ERROR)
-                {
-                    SysLib.cout("Could not add block to inode. ");
-                    return ERROR;
-                }
-
-                fte.inode.toDisk(fte.iNumber);
-            }
     
             // Load the block,
             SysLib.cout("Loading block (" + block + "). ");
@@ -307,7 +287,6 @@
             SysLib.rawwrite(block, data);
 
             // Next contestant.
-            block++;
             bytesWritten += writeLength;
             fte.seekPtr += writeLength;
             // Block offset starts at 0 for new blocks.
@@ -449,54 +428,6 @@
         // Return all freed blocks to the superblock freelist.
         for (int i = 0; i < blocksFreed.size(); i++)
             superBlock.returnBlock((int)blocksFreed.elementAt(i));
-    }
-
-    private short blockFromSeekPtr(int seekPtr, Inode inode)
-    {
-        if (seekPtr < 0)
-            return ERROR;
-
-        int seekBlock = seekPtr / Disk.blockSize;
-
-        if (seekBlock < inode.directSize)
-        {
-            short directBlock = inode.direct[seekBlock];
-            if(directBlock == ERROR)
-            {
-                directBlock = superBlock.claimBlock();
-                if (directBlock == ERROR)
-                {
-                    SysLib.cout("No free blocks! ");
-                    return ERROR;
-                }
-                inode.addBlock(directBlock);
-            }
-            return directBlock;
-        }
-
-        else
-        {
-            if(inode.indirect == ERROR)
-            {
-                inode.indirect = superBlock.claimBlock();
-            }
-
-            byte[] data = new byte[Disk.blockSize];
-            SysLib.rawread(inode.indirect, data);
-
-            short indirectBlock = SysLib.bytes2short(data, seekBlock - inode.directSize);
-            if(indirectBlock == 0)
-            {
-                indirectBlock = superBlock.claimBlock();
-                if (indirectBlock == ERROR)
-                {
-                    SysLib.cout("No free blocks! ");
-                    return ERROR;
-                }
-                inode.addBlock(indirectBlock);
-            }
-            return indirectBlock;
-        }
     }
 
     private FileTableEntry convertFdToFtEnt(int fd)

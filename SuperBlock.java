@@ -81,7 +81,7 @@ class SuperBlock {
 
         sync();                                 // Superblock has changed; update disk.
 
-        SysLib.cout("Freed block (" + result + "). ");
+        SysLib.cout("Claimed block (" + result + "). ");
         SysLib.cout("Next free block (" + freeList + "). ");
         return (short)result;                          // Return the index.
     }

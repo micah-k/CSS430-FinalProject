@@ -34,7 +34,7 @@ public class Inode {
     public Inode(short iNumber)
     {
         this.iNumber = iNumber;
-        
+
         int block = iNumber / 16 + 1; // 16 Inodes in a block. Add 1 to account for rounding down in division.
 
         byte[] inodeData = new byte[Disk.blockSize]; // In computer development there is no way to read a portion of a block from, or write a portion to, the disk.
@@ -79,6 +79,46 @@ public class Inode {
         SysLib.short2bytes(indirect, inodeData, offset); // Indirect pointer...
 
         SysLib.rawwrite(block, inodeData); // Write the block back to the disk.
+    }
+
+    public short blockFromSeekPtr(int seekPtr)
+    {
+        if (seekPtr < 0)
+            return ERROR;
+
+        int seekBlock = seekPtr / Disk.blockSize;
+
+
+        if (seekBlock < directSize)
+        {
+            short directBlock = direct[seekBlock];
+            if(directBlock == ERROR)
+            {
+                SysLib.cout("No direct block here. ");
+                return ERROR;
+            }
+            return directBlock;
+        }
+
+        else
+        {
+            if(indirect == ERROR)
+            {
+                SysLib.cout("No indirect block. ");
+                return ERROR;
+            }
+
+            byte[] data = new byte[Disk.blockSize];
+            SysLib.rawread(indirect, data);
+
+            short indirectBlock = SysLib.bytes2short(data, seekBlock - directSize);
+            if(indirectBlock == 0)
+            {
+                SysLib.cout("Bad indirect pointer. ");
+                return ERROR;
+            }
+            return indirectBlock;
+        }
     }
 
     public int addBlock(short block)
