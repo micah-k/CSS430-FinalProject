@@ -231,7 +231,7 @@
         return bytesWritten;
     }
 
-    private synchronized int writeFromFtEnt(FileTableEntry fte, byte[600] buffer)
+    private synchronized int writeFromFtEnt(FileTableEntry fte, byte[] buffer)
     {
         short block;
         int bytesWritten = 0;
