@@ -86,8 +86,8 @@ public class Inode {
         if (seekPtr < 0)
             return ERROR;
 
-        int seekBlock = seekPtr / Disk.blockSize;
-
+        short seekBlock = seekPtr / Disk.blockSize;
+        SysLib.cout("Seek block: (" + seekBlock + ") ");
 
         if (seekBlock < directSize)
         {
