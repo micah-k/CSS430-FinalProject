@@ -325,6 +325,7 @@
         {
             SysLib.cout("fte.count (" + fte.count + "). ");
             try { wait(); } catch (InterruptedException e){}
+            fte = convertFdToFtEnt(fd);
         }
 
         if(fte.inode.flag != Inode.USED)
