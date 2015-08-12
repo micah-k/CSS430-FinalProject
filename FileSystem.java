@@ -297,8 +297,11 @@
             bytesWritten += writeLength;
             fte.seekPtr += writeLength;
             // Block offset starts at 0 for new blocks.
-            blockOffset = 0; 
+            blockOffset = 0;
+            SysLib.cout("Bytes written (" + bytesWritten + ") , Buffer length (" + buffer.length + "). ");
         }
+
+        SysLib.cout("Returning (" + bytesWritten + "). ");
         return bytesWritten;
     }
 
