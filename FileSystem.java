@@ -321,10 +321,15 @@
         }
 
         // If the file has an open on it, wait for it to finish.
-        while(fte.count > 1)
+        while(fte.count > 1 &&(fte.inode.flag == READ || fte.inode.flag == WRITE))
         {
             SysLib.cout("fte.count (" + fte.count + "). Flag (" + fte.inode.flag + "). ");
             try { wait(); } catch (InterruptedException e){}
+        }
+
+        if(fte.count > 1)
+        {
+            SysLib.cout("FLAG SET TO USED BUT COUNT GREATER THAN 1 IN CLOSE. ");
         }
 
         if(fte.inode.flag != Inode.USED)
